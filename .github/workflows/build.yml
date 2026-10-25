@@ -33,25 +33,11 @@ jobs:
 
       - name: Configure Gradle and App Name
         run: |
-          # Жестко фиксируем SDK 35 в основном build.gradle
+          # Фиксируем SDK 35 в основном build.gradle (не трогая local.properties и android/build.gradle)
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 35/g' android/app/build.gradle || true
           sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 35/g' android/app/build.gradle || true
           sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 35/g' android/app/build.gradle || true
           sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 35/g' android/app/build.gradle || true
-
-          # Принудительно задаем compileSdkVersion 35 для всех подпроектов (geolocator, pedometer и др.)
-          cat << 'EOF' >> android/build.gradle
-
-          subprojects {
-              afterEvaluate { project ->
-                  if (project.hasProperty("android")) {
-                      project.android {
-                          compileSdkVersion 35
-                      }
-                  }
-              }
-          }
-          EOF
           
           # Добавляем namespace tools в манифест
           sed -i 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">|g' android/app/src/main/AndroidManifest.xml
