@@ -47,7 +47,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
   String _startDateStr = '-';
   String _startTimeStr = '-';
   
-  // Список истории за последние дни
   List<MapEntry<String, int>> _history = [];
 
   @override
@@ -90,7 +89,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
       }
     }
 
-    // Сортируем по дате (свежие сверху)
     loadedHistory.sort((a, b) => b.key.compareTo(a.key));
 
     setState(() {
@@ -105,7 +103,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     final dateFormatted = DateFormat('dd.MM.yyyy').format(now);
     final timeFormatted = DateFormat('HH:mm').format(now);
 
-    // Если завершаем день/сбрасываем, сохраняем в историю текущего дня
     if (finalSteps > 0) {
       String dayKey = 'day_steps_$dateFormatted';
       int existingSteps = prefs.getInt(dayKey) ?? 0;
@@ -177,7 +174,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Шапка
                 const Text(
                   'ШАГОМЕР',
                   style: TextStyle(
@@ -188,7 +184,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                 ),
                 
-                // Главный круг со счетчиком
                 Container(
                   width: 180,
                   height: 180,
@@ -244,7 +239,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                 ),
 
-                // Карточки статистики (Дистанция и Калории)
                 Row(
                   children: [
                     Expanded(
@@ -267,7 +261,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // Блок истории по дням
                 Container(
                   height: 100,
                   padding: const EdgeInsets.all(10),
@@ -286,7 +279,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       const SizedBox(height: 6),
                       Expanded(
                         child: _history.isEmpty
-                            ... ? const Center(child: Text('Нет сохраненных дней', style: TextStyle(color: Colors.white38, fontSize: 12)))
+                            ? const Center(child: Text('Нет сохраненных дней', style: TextStyle(color: Colors.white38, fontSize: 12)))
                             : ListView.builder(
                                 itemCount: _history.length,
                                 itemBuilder: (context, index) {
@@ -308,7 +301,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                 ),
                 
-                // Кнопка сброса
                 Container(
                   width: double.infinity,
                   height: 48,
