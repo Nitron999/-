@@ -34,6 +34,8 @@ jobs:
       - name: Configure SDK 35 and Permissions
         run: |
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
           echo "flutter.compileSdkVersion=35" >> android/local.properties
           echo "flutter.targetSdkVersion=35" >> android/local.properties
 
