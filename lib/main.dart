@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,8 +45,9 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _currentTotalSteps = 0;
   bool _hasPermission = false;
 
-  final LatLng _centerLocation = const LatLng(55.751244, 37.618423);
+  LatLng _currentLocation = const LatLng(55.751244, 37.618423); // Москва по умолчанию
   final MapController _mapController = MapController();
+  bool _isLocating = false;
 
   @override
   void initState() {
@@ -63,6 +65,40 @@ class _PedometerScreenState extends State<PedometerScreen> {
       _initPedometer();
     } else {
       setState(() => _status = 'Нет разрешения на датчик');
+    }
+  }
+
+  // Реальное определение координат по нажатию на кнопку
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isLocating = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _isLocating = false);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => _isLocating = false);
+          return;
+        }
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high
+      );
+
+      setState(() {
+        _currentLocation = LatLng(position.latitude, position.longitude);
+        _isLocating = false;
+      });
+
+      _mapController.move(_currentLocation, 16.0);
+    } catch (e) {
+      setState(() => _isLocating = false);
     }
   }
 
@@ -244,7 +280,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                         FlutterMap(
                           mapController: _mapController,
                           options: MapOptions(
-                            initialCenter: _centerLocation,
+                            initialCenter: _currentLocation,
                             initialZoom: 15.0,
                           ),
                           children: [
@@ -255,7 +291,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                             MarkerLayer(
                               markers: [
                                 Marker(
-                                  point: _centerLocation,
+                                  point: _currentLocation,
                                   width: 40,
                                   height: 40,
                                   child: const Icon(
@@ -275,10 +311,17 @@ class _PedometerScreenState extends State<PedometerScreen> {
                             backgroundColor: const Color(0xFF16161E),
                             foregroundColor: const Color(0xFF00FF87),
                             elevation: 4,
-                            onPressed: () {
-                              _mapController.move(_centerLocation, 15.0);
-                            },
-                            child: const Icon(Icons.my_location, size: 22),
+                            onPressed: _isLocating ? null : _getCurrentLocation,
+                            child: _isLocating
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF00FF87),
+                                    ),
+                                  )
+                                : const Icon(Icons.my_location, size: 22),
                           ),
                         ),
                       ],
