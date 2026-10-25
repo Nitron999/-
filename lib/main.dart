@@ -15,7 +15,6 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Инициализация локальных уведомлений для Android
   const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -80,7 +79,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
   }
 
   Future<void> _initApp() async {
-    // Запрос разрешений на датчик шагов и уведомления (актуально для Android 13+)
     await [
       Permission.activityRecognition,
       Permission.notification,
@@ -282,7 +280,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
       if (finalSteps >= _dailyGoal && !_goalAchievedShown) {
         _goalAchievedShown = true;
         HapticFeedback.vibrate();
-        // Отправка системного push-уведомления на экран блокировки
         _showGoalNotification();
         _showGoalAchievedDialog();
       }
@@ -296,7 +293,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     });
   }
 
-  // Функция показа системного уведомления для экрана блокировки
   Future<void> _showGoalNotification() async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
@@ -617,28 +613,30 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
+                // Стильные массивные 3D-карточки статистики
                 Row(
                   children: [
                     Expanded(
-                      child: _buildStatCard(
+                      child: _build3DStatCard(
                         Icons.route_rounded, 
                         'Дистанция', 
                         '${distanceKm.toStringAsFixed(2)} км ($distanceMeters м)', 
-                        const Color(0xFF60EFFF)
+                        const Color(0xFF00FF87)
                       )
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _buildStatCard(
+                      child: _build3DStatCard(
                         Icons.local_fire_department_rounded, 
                         'Калории', 
                         '$calories ккал', 
-                        const Color(0xFFFF512F)
+                        const Color(0xFFFF4B2B)
                       )
                     ),
                   ],
                 ),
 
+                // График активности с объемным зеленым акцентом
                 GestureDetector(
                   onTap: _showCalendarPicker,
                   child: Container(
@@ -647,19 +645,33 @@ class _PedometerScreenState extends State<PedometerScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFF23232F),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF00FF87).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF00FF87).withOpacity(0.4)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
+                            const Text(
                               'График активности (нажмите для календаря)',
                               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
                             ),
-                            Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFF00FF87)),
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00FF87).withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFF00FF87)),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -719,6 +731,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                 ),
                 
+                // Кнопка сброса
                 Container(
                   width: double.infinity,
                   height: 48,
@@ -729,9 +742,9 @@ class _PedometerScreenState extends State<PedometerScreen> {
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFFF4B2B).withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                        color: const Color(0xFFFF4B2B).withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 5),
                       ),
                     ],
                   ),
@@ -761,30 +774,55 @@ class _PedometerScreenState extends State<PedometerScreen> {
     );
   }
 
-  Widget _buildStatCard(IconData icon, String title, String value, Color iconColor) {
+  // Метод для создания стильных объемных 3D-карточек с крупными иконками
+  Widget _build3DStatCard(IconData icon, String title, String value, Color accentColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF23232F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: accentColor.withOpacity(0.35), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withOpacity(0.12),
+            blurRadius: 10,
+            spreadRadius: 1,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(icon, color: iconColor, size: 26),
-          const SizedBox(width: 10),
+          // Объемная 3D-подложка под иконку
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  accentColor.withOpacity(0.3),
+                  accentColor.withOpacity(0.1),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: accentColor.withOpacity(0.5), width: 1),
+            ),
+            child: Icon(icon, color: accentColor, size: 28),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 11, color: Colors.white54),
+                  style: const TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
