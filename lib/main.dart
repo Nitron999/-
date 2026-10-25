@@ -31,7 +31,6 @@ void main() async {
   runApp(const PedometerApp());
 }
 
-// Настройка фоновой службы Android
 Future<void> initializeBackgroundService() async {
   final service = FlutterBackgroundService();
 
@@ -39,7 +38,7 @@ Future<void> initializeBackgroundService() async {
     'pedometer_foreground_channel',
     'Шагомер Фоновый Сервис',
     description: 'Удержание счетчика шагов активным в фоне',
-    importance: Importance.low,
+    importance: Importance.max, // Подняли до максимума
   );
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -64,7 +63,6 @@ Future<void> initializeBackgroundService() async {
   );
 }
 
-// Фоновый поток, работающий при свернутом/заблокированном телефоне
 @pragma('vm:entry-point')
 void onBackgroundServiceStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
@@ -102,20 +100,23 @@ void onBackgroundServiceStart(ServiceInstance service) async {
     int finalSteps = currentSteps < 0 ? 0 : currentSteps;
     int dailyGoal = prefs.getInt('daily_goal') ?? 5000;
 
-    // Проверка достижения цели в фоне
     if (finalSteps >= dailyGoal && !goalSent) {
       goalSent = true;
 
+      // ЖЕСТКИЕ НАСТРОЙКИ ДЛЯ ЭКРАНА БЛОКИРОВКИ
       const AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
         'pedometer_goal_channel',
         'Цели шагов',
         channelDescription: 'Уведомления о достижении ежедневной цели шагов',
         importance: Importance.max,
-        priority: Priority.high,
+        priority: Priority.max,
         ticker: 'Цель выполнена!',
         playSound: true,
         enableVibration: true,
+        visibility: NotificationVisibility.public, // ПОКАЗЫВАТЬ НА ЗАБЛОКИРОВАННОМ ЭКРАНЕ
+        category: AndroidNotificationCategory.alarm, // Будит систему как будильник
+        fullScreenIntent: true,
       );
 
       const NotificationDetails platformChannelSpecifics =
@@ -409,10 +410,13 @@ class _PedometerScreenState extends State<PedometerScreen> {
       'Цели шагов',
       channelDescription: 'Уведомления о достижении ежедневной цели шагов',
       importance: Importance.max,
-      priority: Priority.high,
+      priority: Priority.max,
       ticker: 'Цель выполнена!',
       playSound: true,
       enableVibration: true,
+      visibility: NotificationVisibility.public,
+      category: AndroidNotificationCategory.alarm,
+      fullScreenIntent: true,
     );
 
     const NotificationDetails platformChannelSpecifics =
