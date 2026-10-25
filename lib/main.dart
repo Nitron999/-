@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart' as geo;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,8 +45,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _currentTotalSteps = 0;
   bool _hasPermission = false;
 
-  // Координаты карты и контроллер
-  LatLng _currentLocation = const LatLng(55.751244, 37.618423); // Москва по умолчанию
+  LatLng _currentLocation = const LatLng(55.751244, 37.618423);
   final MapController _mapController = MapController();
   bool _isLocating = false;
 
@@ -69,27 +68,26 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }
   }
 
-  // Метод ручного определения реального местоположения по нажатию кнопки
   Future<void> _getCurrentLocation() async {
     setState(() => _isLocating = true);
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      bool serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         setState(() => _isLocating = false);
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
+      geo.LocationPermission permission = await geo.Geolocator.checkPermission();
+      if (permission == geo.LocationPermission.denied) {
+        permission = await geo.Geolocator.requestPermission();
+        if (permission == geo.LocationPermission.denied) {
           setState(() => _isLocating = false);
           return;
         }
       }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high
+      geo.Position position = await geo.Geolocator.getCurrentPosition(
+        desiredAccuracy: geo.LocationAccuracy.high
       );
 
       setState(() {
@@ -267,7 +265,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   
                   const SizedBox(height: 24),
                   
-                  // Блок карты с кнопкой геолокации поверх
                   Container(
                     height: 250,
                     width: double.infinity,
@@ -281,7 +278,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       children: [
                         FlutterMap(
                           mapController: _mapController,
-                          options: MapOptions(
+                        options: MapOptions(
                             initialCenter: _currentLocation,
                             initialZoom: 15.0,
                           ),
@@ -306,7 +303,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                             ),
                           ],
                         ),
-                        // Кнопка определения местоположения в правом нижнем углу карты
                         Positioned(
                           bottom: 12,
                           right: 12,
