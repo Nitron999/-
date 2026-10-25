@@ -37,10 +37,10 @@ jobs:
           echo "flutter.compileSdkVersion=35" >> android/local.properties
           echo "flutter.targetSdkVersion=35" >> android/local.properties
           
-          # Автоматически прописываем compileSdk = 35 в build.gradle, как требует pedometer
+          # Жестко прописываем compileSdk = 35 в build.gradle для pedometer
           sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdk = 35/g' android/app/build.gradle || true
           
-          # Добавляем разрешения в Manifest
+          # Разрешения в Manifest
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />' android/app/src/main/AndroidManifest.xml
