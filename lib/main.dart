@@ -38,7 +38,7 @@ Future<void> initializeBackgroundService() async {
     'pedometer_foreground_channel',
     'Шагомер Фоновый Сервис',
     description: 'Удержание счетчика шагов активным в фоне',
-    importance: Importance.max, // Подняли до максимума
+    importance: Importance.max,
   );
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -66,6 +66,8 @@ Future<void> initializeBackgroundService() async {
 @pragma('vm:entry-point')
 void onBackgroundServiceStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
+  // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Инициализация Flutter-движка внутри изолята
+  WidgetsFlutterBinding.ensureInitialized();
 
   final FlutterLocalNotificationsPlugin backgroundNotifications =
       FlutterLocalNotificationsPlugin();
@@ -103,7 +105,6 @@ void onBackgroundServiceStart(ServiceInstance service) async {
     if (finalSteps >= dailyGoal && !goalSent) {
       goalSent = true;
 
-      // ЖЕСТКИЕ НАСТРОЙКИ ДЛЯ ЭКРАНА БЛОКИРОВКИ
       const AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
         'pedometer_goal_channel',
@@ -114,8 +115,8 @@ void onBackgroundServiceStart(ServiceInstance service) async {
         ticker: 'Цель выполнена!',
         playSound: true,
         enableVibration: true,
-        visibility: NotificationVisibility.public, // ПОКАЗЫВАТЬ НА ЗАБЛОКИРОВАННОМ ЭКРАНЕ
-        category: AndroidNotificationCategory.alarm, // Будит систему как будильник
+        visibility: NotificationVisibility.public,
+        category: AndroidNotificationCategory.alarm,
         fullScreenIntent: true,
       );
 
