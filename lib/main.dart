@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
+import 'package:audioplayers/audioplayers.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,15 +55,23 @@ class _PedometerScreenState extends State<PedometerScreen> {
   List<MapEntry<String, int>> _history = [];
   bool _goalAchievedShown = false;
 
-  // Погода с надежным дефолтным значением на случай сбоя сети
-  String _weatherInfo = 'Москва, 16°C, Ясно';
+  String _cityName = 'Москва';
+  String _weatherInfo = 'Загрузка...';
   IconData _weatherIcon = Icons.wb_sunny_rounded;
+
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
     super.initState();
     _initApp();
-    _fetchWeather();
+    _loadCityAndWeather();
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
   }
 
   Future<void> _initApp() async {
@@ -76,26 +85,55 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }
   }
 
-  Future<void> _fetchWeather() async {
+  Future<void> _loadCityAndWeather() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String savedCity = prefs.getString('user_city') ?? 'Москва';
+    setState(() {
+      _cityName = savedCity;
+    });
+    await _fetchWeatherForCity(savedCity);
+  }
+
+  // Поиск координат города и погоды через свободные API
+  Future<void> _fetchWeatherForCity(String cityName) async {
     try {
-      final response = await http.get(
-        Uri.parse('https://api.open-meteo.com/v1/forecast?latitude=55.7522&current=temperature_2m,weather_code&timezone=Europe%2FMoscow')
+      // 1. Геокодируем название города в широту и долготу
+      final geoResponse = await http.get(
+        Uri.parse('https://geocoding-api.open-meteo.com/v1/search?name=$cityName&count=1&language=ru&format=json')
       ).timeout(const Duration(seconds: 5));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final temp = data['current']['temperature_2m'];
-        final code = data['current']['weather_code'];
-        
-        setState(() {
-          _weatherInfo = 'Москва, ${temp.round()}°C, ${_getWeatherDescription(code)}';
-          _weatherIcon = _getWeatherIcon(code);
-        });
+      if (geoResponse.statusCode == 200) {
+        final geoData = json.decode(geoResponse.body);
+        if (geoData['results'] != null && geoData['results'].isNotEmpty) {
+          final lat = geoData['results'][0]['latitude'];
+          final lon = geoData['results'][0]['longitude'];
+          final realName = geoData['results'][0]['name'];
+
+          // 2. Получаем погоду по найденным координатам
+          final weatherResponse = await http.get(
+            Uri.parse('https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code')
+          ).timeout(const Duration(seconds: 5));
+
+          if (weatherResponse.statusCode == 200) {
+            final weatherData = json.decode(weatherResponse.body);
+            final temp = weatherData['current']['temperature_2m'];
+            final code = weatherData['current']['weather_code'];
+
+            setState(() {
+              _cityName = realName;
+              _weatherInfo = '$realName, ${temp.round()}°C, ${_getWeatherDescription(code)}';
+              _weatherIcon = _getWeatherIcon(code);
+            });
+            return;
+          }
+        }
       }
-    } catch (_) {
-      // Если сеть недоступна, оставляем дефолтную погоду без зависания
       setState(() {
-        _weatherInfo = 'Москва, 16°C, Ясно';
+        _weatherInfo = '$cityName, погода не найдена';
+      });
+    } catch (_) {
+      setState(() {
+        _weatherInfo = '$cityName, ошибка сети';
       });
     }
   }
@@ -114,6 +152,59 @@ class _PedometerScreenState extends State<PedometerScreen> {
     if (code >= 51 && code <= 67) return Icons.water_drop_rounded;
     if (code >= 71 && code <= 77) return Icons.ac_unit_rounded;
     return Icons.cloud_outlined;
+  }
+
+  // Окно выбора города
+  void _showCityPickerDialog() {
+    TextEditingController cityController = TextEditingController(text: _cityName);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF23232F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Выбрать город', style: TextStyle(color: Colors.white, fontSize: 18)),
+        content: TextField(
+          controller: cityController,
+          style: const TextStyle(color: Colors.white, fontSize: 18),
+          decoration: InputDecoration(
+            hintText: 'Введите название города',
+            hintStyle: const TextStyle(color: Colors.white38),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.white24),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF00FF87)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              String newCity = cityController.text.trim();
+              if (newCity.isNotEmpty) {
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                await prefs.setString('user_city', newCity);
+                setState(() {
+                  _cityName = newCity;
+                  _weatherInfo = 'Загрузка...';
+                });
+                _fetchWeatherForCity(newCity);
+              }
+              if (!mounted) return;
+              Navigator.pop(context);
+            },
+            child: const Text('Найти', style: TextStyle(color: Color(0xFF00FF87), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadSavedData() async {
@@ -183,8 +274,9 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
       if (finalSteps >= _dailyGoal && !_goalAchievedShown) {
         _goalAchievedShown = true;
-        // Мощная тактильная вибрация при достижении цели (физический отклик)
+        // Вибрация + Звуковой сигнал достижения цели
         HapticFeedback.heavyImpact();
+        _playGoalSound();
         _showGoalAchievedDialog();
       }
 
@@ -195,6 +287,12 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }).onError((error) {
       setState(() => _status = 'Датчик шагов недоступен');
     });
+  }
+
+  Future<void> _playGoalSound() async {
+    try {
+      await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
+    } catch (_) {}
   }
 
   void _showEditGoalDialog() {
@@ -380,19 +478,24 @@ class _PedometerScreenState extends State<PedometerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Шапка с погодой и кликабельной целью
+                // Шапка с кликабельной погодой и целью
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(_weatherIcon, color: const Color(0xFF60EFFF), size: 20),
-                        const SizedBox(width: 6),
-                        Text(
-                          _weatherInfo,
-                          style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                      ],
+                    GestureDetector(
+                      onTap: _showCityPickerDialog,
+                      child: Row(
+                        children: [
+                          Icon(_weatherIcon, color: const Color(0xFF60EFFF), size: 20),
+                          const SizedBox(width: 6),
+                          Text(
+                            _weatherInfo,
+                            style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.edit_rounded, size: 12, color: Colors.white54),
+                        ],
+                      ),
                     ),
                     GestureDetector(
                       onTap: _showEditGoalDialog,
