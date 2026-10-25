@@ -33,7 +33,12 @@ jobs:
 
       - name: Configure Gradle and App Name
         run: |
-          # Фиксируем SDK 35 в основном build.gradle (не трогая local.properties и android/build.gradle)
+          # Создаем local.properties, чтобы плагины не теряли пути Flutter и SDK
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+          echo "flutter.compileSdkVersion=35" >> android/local.properties
+          echo "flutter.targetSdkVersion=35" >> android/local.properties
+          
+          # Фиксируем SDK 35 в build.gradle
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 35/g' android/app/build.gradle || true
           sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 35/g' android/app/build.gradle || true
           sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 35/g' android/app/build.gradle || true
