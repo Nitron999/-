@@ -7,9 +7,23 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-void main() {
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Инициализация локальных уведомлений для Android
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  const InitializationSettings initializationSettings =
+      InitializationSettings(android: initializationSettingsAndroid);
+
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
   runApp(const PedometerApp());
 }
 
@@ -66,8 +80,14 @@ class _PedometerScreenState extends State<PedometerScreen> {
   }
 
   Future<void> _initApp() async {
-    PermissionStatus status = await Permission.activityRecognition.request();
-    if (status.isGranted) {
+    // Запрос разрешений на датчик шагов и уведомления (актуально для Android 13+)
+    await [
+      Permission.activityRecognition,
+      Permission.notification,
+    ].request();
+
+    PermissionStatus status = await Permission.activityRecognition.status;
+    if (status.isGranted || status.isLimited) {
       setState(() => _hasPermission = true);
       await _loadSavedData();
       _initPedometer();
@@ -231,7 +251,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
       }
     }
 
-    loadedHistory.sort((a, b) => b.key.compareTo(b.key));
+    loadedHistory.sort((a, b) => b.key.compareTo(a.key));
 
     setState(() {
       _history = loadedHistory;
@@ -261,9 +281,9 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
       if (finalSteps >= _dailyGoal && !_goalAchievedShown) {
         _goalAchievedShown = true;
-        // Гарантированный системный звук и мощная вибрация при достижении цели
-        SystemSound.play(SystemSoundType.alert);
         HapticFeedback.vibrate();
+        // Отправка системного push-уведомления на экран блокировки
+        _showGoalNotification();
         _showGoalAchievedDialog();
       }
 
@@ -274,6 +294,29 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }).onError((error) {
       setState(() => _status = 'Датчик шагов недоступен');
     });
+  }
+
+  // Функция показа системного уведомления для экрана блокировки
+  Future<void> _showGoalNotification() async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'pedometer_goal_channel',
+      'Цели шагов',
+      channelDescription: 'Уведомления о достижении ежедневной цели шагов',
+      importance: Importance.max,
+      priority: Priority.high,
+      ticker: 'Цель выполнена!',
+    );
+
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      '🎉 Цель выполнена!',
+      'Поздравляем! Вы прошли уже $_dailyGoal шагов сегодня!',
+      platformChannelSpecifics,
+    );
   }
 
   void _showEditGoalDialog() {
@@ -354,7 +397,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     );
   }
 
-  // Сброс счетчика с четким системным щелчком и вибрацией
   Future<void> _resetCounter() async {
     if (_steps > 0) {
       SystemSound.play(SystemSoundType.click);
