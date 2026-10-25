@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,9 +45,10 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _currentTotalSteps = 0;
   bool _hasPermission = false;
 
-  // Координаты центра карты (Москва по умолчанию)
-  final LatLng _defaultLocation = const LatLng(55.751244, 37.618423);
+  // Координаты карты и контроллер
+  LatLng _currentLocation = const LatLng(55.751244, 37.618423); // Москва по умолчанию
   final MapController _mapController = MapController();
+  bool _isLocating = false;
 
   @override
   void initState() {
@@ -56,7 +58,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   Future<void> _initApp() async {
     PermissionStatus status = await Permission.activityRecognition.request();
-    PermissionStatus locationStatus = await Permission.location.request();
+    await Permission.location.request();
     
     if (status.isGranted) {
       setState(() => _hasPermission = true);
@@ -64,6 +66,40 @@ class _PedometerScreenState extends State<PedometerScreen> {
       _initPedometer();
     } else {
       setState(() => _status = 'Нет разрешения на датчик');
+    }
+  }
+
+  // Метод ручного определения реального местоположения по нажатию кнопки
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isLocating = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() => _isLocating = false);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() => _isLocating = false);
+          return;
+        }
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high
+      );
+
+      setState(() {
+        _currentLocation = LatLng(position.latitude, position.longitude);
+        _isLocating = false;
+      });
+
+      _mapController.move(_currentLocation, 16.0);
+    } catch (e) {
+      setState(() => _isLocating = false);
     }
   }
 
@@ -231,7 +267,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   
                   const SizedBox(height: 24),
                   
-                  // Блок с картой без ошибок компиляции
+                  // Блок карты с кнопкой геолокации поверх
                   Container(
                     height: 250,
                     width: double.infinity,
@@ -241,30 +277,55 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       border: Border.all(color: Colors.white10),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: _defaultLocation,
-                        initialZoom: 15.0,
-                      ),
+                    child: Stack(
                       children: [
-                        TileLayer(
-                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.zhigomer.app',
-                        ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _defaultLocation,
-                              width: 40,
-                              height: 40,
-                              child: const Icon(
-                                Icons.location_on, 
-                                color: Colors.redAccent, 
-                                size: 40
-                              ),
+                        FlutterMap(
+                          mapController: _mapController,
+                          options: MapOptions(
+                            initialCenter: _currentLocation,
+                            initialZoom: 15.0,
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'com.zhigomer.app',
+                            ),
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: _currentLocation,
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(
+                                    Icons.location_on, 
+                                    color: Colors.redAccent, 
+                                    size: 40
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
+                        ),
+                        // Кнопка определения местоположения в правом нижнем углу карты
+                        Positioned(
+                          bottom: 12,
+                          right: 12,
+                          child: FloatingActionButton.small(
+                            backgroundColor: const Color(0xFF16161E),
+                            foregroundColor: const Color(0xFF00FF87),
+                            elevation: 4,
+                            onPressed: _isLocating ? null : _getCurrentLocation,
+                            child: _isLocating
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF00FF87),
+                                    ),
+                                  )
+                                : const Icon(Icons.my_location, size: 22),
+                          ),
                         ),
                       ],
                     ),
