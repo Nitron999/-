@@ -18,4 +18,33 @@ jobs:
           java-version: '17'
 
       - name: Set up Flutter
-        uses: subosito/
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.3'
+          channel: 'stable'
+
+      - name: Install Android SDK 35
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Generate Android project files
+        run: flutter create . --org com.zhigomer.app --project-name zhigomer --platforms=android
+
+      - name: Configure SDK 35 and Permissions
+        run: |
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />' android/app/src/main/AndroidManifest.xml
+          echo "flutter.compileSdkVersion=35" >> android/local.properties
+          echo "flutter.targetSdkVersion=35" >> android/local.properties
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
