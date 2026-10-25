@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:intl/intl.dart'; // Для красивого форматирования даты и времени
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +16,7 @@ class PedometerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: 'Zhigomer',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F0F13),
         appBarTheme: const AppBarTheme(
@@ -44,8 +44,9 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _currentTotalSteps = 0;
   bool _hasPermission = false;
 
-  final LatLng _centerLocation = const LatLng(55.751244, 37.618423);
-  final MapController _mapController = MapController();
+  // Переменные для даты и времени старта
+  String _startDateStr = '-';
+  String _startTimeStr = '-';
 
   @override
   void initState() {
@@ -55,29 +56,39 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   Future<void> _initApp() async {
     PermissionStatus status = await Permission.activityRecognition.request();
-    await Permission.location.request();
-    
     if (status.isGranted) {
       setState(() => _hasPermission = true);
-      await _loadBaseSteps();
+      await _loadSavedData();
       _initPedometer();
     } else {
       setState(() => _status = 'Нет разрешения на датчик');
     }
   }
 
-  Future<void> _loadBaseSteps() async {
+  Future<void> _loadSavedData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       _savedBaseSteps = prefs.getInt('base_steps') ?? -1;
+      _startDateStr = prefs.getString('start_date') ?? '-';
+      _startTimeStr = prefs.getString('start_time') ?? '-';
     });
   }
 
-  Future<void> _saveBaseSteps(int base) async {
+  Future<void> _saveSessionData(int base) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    
+    final now = DateTime.now();
+    final dateFormatted = DateFormat('dd.MM.yyyy').format(now);
+    final timeFormatted = DateFormat('HH:mm').format(now);
+
     await prefs.setInt('base_steps', base);
+    await prefs.setString('start_date', dateFormatted);
+    await prefs.setString('start_time', timeFormatted);
+
     setState(() {
       _savedBaseSteps = base;
+      _startDateStr = dateFormatted;
+      _startTimeStr = timeFormatted;
     });
   }
 
@@ -88,8 +99,9 @@ class _PedometerScreenState extends State<PedometerScreen> {
       
       _currentTotalSteps = event.steps;
 
+      // Привязка точки отсчета и времени при первом запуске или сбросе
       if (_savedBaseSteps == -1 || _currentTotalSteps < _savedBaseSteps) {
-        _saveBaseSteps(_currentTotalSteps);
+        _saveSessionData(_currentTotalSteps);
       }
 
       setState(() {
@@ -103,7 +115,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   void _resetCounter() {
     if (_currentTotalSteps > 0) {
-      _saveBaseSteps(_currentTotalSteps);
+      _saveSessionData(_currentTotalSteps);
       setState(() {
         _steps = 0;
         _status = 'Сброшено. Начинаем заново...';
@@ -135,11 +147,11 @@ class _PedometerScreenState extends State<PedometerScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Text(
-                    'ШАГОМЕР 3000',
+                    'PEDOMETER',
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 28,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
+                      letterSpacing: 3,
                       color: Colors.white,
                     ),
                   ),
@@ -185,7 +197,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                               ),
                             ),
                             const Text(
-                              'ШАГОВ',
+                              'STEPS',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -206,13 +218,14 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                   const SizedBox(height: 30),
 
+                  // Карточки статистики: Дистанция + Калории
                   Row(
                     children: [
                       Expanded(
                         child: _buildStatCard(
                           Icons.route_rounded, 
-                          'Дистанция', 
-                          '${distanceKm.toStringAsFixed(2)} км\n$distanceMeters м', 
+                          'Distance', 
+                          '${distanceKm.toStringAsFixed(2)} km\n$distanceMeters m', 
                           const Color(0xFF60EFFF)
                         )
                       ),
@@ -220,72 +233,40 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       Expanded(
                         child: _buildStatCard(
                           Icons.local_fire_department_rounded, 
-                          'Калории', 
-                          '$calories ккал\n', 
+                          'Calories', 
+                          '$calories kcal\n', 
                           const Color(0xFFFF512F)
                         )
                       ),
                     ],
                   ),
                   
-                  const SizedBox(height: 24),
-                  
-                  Container(
-                    height: 250,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF23232F),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Stack(
-                      children: [
-                        FlutterMap(
-                          mapController: _mapController,
-                          options: MapOptions(
-                            initialCenter: _centerLocation,
-                            initialZoom: 15.0,
-                          ),
-                          children: [
-                            TileLayer(
-                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              userAgentPackageName: 'com.zhigomer.app',
-                            ),
-                            MarkerLayer(
-                              markers: [
-                                Marker(
-                                  point: _centerLocation,
-                                  width: 40,
-                                  height: 40,
-                                  child: const Icon(
-                                    Icons.location_on, 
-                                    color: Colors.redAccent, 
-                                    size: 40
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        Positioned(
-                          bottom: 12,
-                          right: 12,
-                          child: FloatingActionButton.small(
-                            backgroundColor: const Color(0xFF16161E),
-                            foregroundColor: const Color(0xFF00FF87),
-                            elevation: 4,
-                            onPressed: () {
-                              _mapController.move(_centerLocation, 15.0);
-                            },
-                            child: const Icon(Icons.my_location, size: 22),
-                          ),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 16),
+
+                  // Карточки времени и даты старта движения
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          Icons.calendar_today_rounded, 
+                          'Start Date', 
+                          _startDateStr, 
+                          const Color(0xFF00FF87)
+                        )
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildStatCard(
+                          Icons.access_time_rounded, 
+                          'Start Time', 
+                          _startTimeStr, 
+                          const Color(0xFFFFA500)
+                        )
+                      ),
+                    ],
                   ),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 30),
                   
                   ElevatedButton(
                     onPressed: _hasPermission ? _resetCounter : null,
@@ -298,7 +279,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       elevation: 0,
                     ),
                     child: const Text(
-                      'СБРОСИТЬ СЧЕТЧИК',
+                      'RESET STEP COUNTER',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
                     ),
                   ),
@@ -326,7 +307,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
           const SizedBox(height: 16),
           Text(
             value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white, height: 1.3),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white, height: 1.3),
           ),
           const SizedBox(height: 4),
           Text(
