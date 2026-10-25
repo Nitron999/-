@@ -13,6 +13,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:location/location.dart' as loc;
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -196,15 +197,23 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   // Переменные для карты и маршрутов
   final MapController _mapController = MapController();
-  LatLng? _currentPosition = const LatLng(55.7558, 37.6173); // Москва по умолчанию
+  LatLng? _currentPosition;
   List<LatLng> _routePoints = [];
   bool _isLocating = false;
+  final loc.Location _locationService = loc.Location();
+  StreamSubscription<loc.LocationData>? _locationSubscription;
 
   @override
   void initState() {
     super.initState();
     _initApp();
     _loadCityAndWeather();
+  }
+
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _initApp() async {
@@ -236,6 +245,57 @@ class _PedometerScreenState extends State<PedometerScreen> {
     } else {
       setState(() => _status = 'Нет разрешения на датчик');
     }
+
+    // Автоматический запуск GPS-трекинга
+    _initLocationTracking();
+  }
+
+  Future<void> _initLocationTracking() async {
+    bool serviceEnabled = await _locationService.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await _locationService.requestService();
+      if (!serviceEnabled) return;
+    }
+
+    loc.PermissionStatus permissionGranted = await _locationService.hasPermission();
+    if (permissionGranted == loc.PermissionStatus.denied) {
+      permissionGranted = await _locationService.requestPermission();
+      if (permissionGranted != loc.PermissionStatus.granted) return;
+    }
+
+    try {
+      loc.LocationData locData = await _locationService.getLocation();
+      if (locData.latitude != null && locData.longitude != null) {
+        LatLng pos = LatLng(locData.latitude!, locData.longitude!);
+        setState(() {
+          _currentPosition = pos;
+          if (_routePoints.isEmpty) {
+            _routePoints.add(pos);
+          }
+        });
+      }
+    } catch (_) {}
+
+    // Слушаем перемещение телефона в реальном времени
+    _locationSubscription = _locationService.onLocationChanged.listen((loc.LocationData currentLoc) {
+      if (currentLoc.latitude != null && currentLoc.longitude != null) {
+        LatLng newPoint = LatLng(currentLoc.latitude!, currentLoc.longitude!);
+        setState(() {
+          _currentPosition = newPoint;
+          if (_routePoints.isEmpty) {
+            _routePoints.add(newPoint);
+            _saveRoute();
+          } else {
+            final Distance distance = const Distance();
+            double meters = distance.as(LengthUnit.Meter, _routePoints.last, newPoint);
+            if (meters >= 3) { // Записывать новую точку каждые 3 метра движения
+              _routePoints.add(newPoint);
+              _saveRoute();
+            }
+          }
+        });
+      }
+    });
   }
 
   Future<void> _loadSavedRoute() async {
@@ -269,21 +329,23 @@ class _PedometerScreenState extends State<PedometerScreen> {
     await prefs.setStringList('route_points', toSave);
   }
 
-  // Кнопка «Найти меня» на карте
+  // Кнопка «Найти меня» на карте (прицел)
   Future<void> _centerOnUser() async {
     HapticFeedback.lightImpact();
     setState(() => _isLocating = true);
 
-    var status = await Permission.location.request();
-    if (status.isGranted) {
+    try {
+      loc.LocationData locData = await _locationService.getLocation();
+      if (locData.latitude != null && locData.longitude != null) {
+        LatLng pos = LatLng(locData.latitude!, locData.longitude!);
+        setState(() {
+          _currentPosition = pos;
+        });
+        _mapController.move(pos, 17.0);
+      }
+    } catch (_) {
       if (_currentPosition != null) {
         _mapController.move(_currentPosition!, 17.0);
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Включите разрешение на геолокацию в настройках')),
-        );
       }
     }
 
