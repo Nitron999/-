@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +45,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _steps = 0;
   int _savedBaseSteps = -1;
   bool _hasPermission = false;
-  int _dailyGoal = 10000; // Цель по умолчанию
+  int _dailyGoal = 10000;
 
   String _startDateStr = '-';
   String _startTimeStr = '-';
@@ -51,10 +53,14 @@ class _PedometerScreenState extends State<PedometerScreen> {
   List<MapEntry<String, int>> _history = [];
   bool _goalAchievedShown = false;
 
+  String _weatherInfo = 'Загрузка погоды...';
+  IconData _weatherIcon = Icons.wb_sunny_rounded;
+
   @override
   void initState() {
     super.initState();
     _initApp();
+    _fetchWeather();
   }
 
   Future<void> _initApp() async {
@@ -66,6 +72,44 @@ class _PedometerScreenState extends State<PedometerScreen> {
     } else {
       setState(() => _status = 'Нет разрешения на датчик');
     }
+  }
+
+  Future<void> _fetchWeather() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.open-meteo.com/v1/forecast?latitude=55.7522&current=temperature_2m,weather_code&timezone=Europe%2FMoscow')
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final temp = data['current']['temperature_2m'];
+        final code = data['current']['weather_code'];
+        
+        setState(() {
+          _weatherInfo = '${temp.round()}°C, ${_getWeatherDescription(code)}';
+          _weatherIcon = _getWeatherIcon(code);
+        });
+      }
+    } catch (_) {
+      setState(() {
+        _weatherInfo = 'Погода недоступна';
+      });
+    }
+  }
+
+  String _getWeatherDescription(int code) {
+    if (code == 0) return 'Ясно';
+    if (code >= 1 && code <= 3) return 'Облачно';
+    if (code >= 51 && code <= 67) return 'Дождь';
+    if (code >= 71 && code <= 77) return 'Снег';
+    return 'Пасмурно';
+  }
+
+  IconData _getWeatherIcon(int code) {
+    if (code == 0) return Icons.wb_sunny_rounded;
+    if (code >= 1 && code <= 3) return Icons.cloud_rounded;
+    if (code >= 51 && code <= 67) return Icons.water_drop_rounded;
+    if (code >= 71 && code <= 77) return Icons.ac_unit_rounded;
+    return Icons.cloud_outlined;
   }
 
   Future<void> _loadSavedData() async {
@@ -105,7 +149,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
       }
     }
 
-    // Сортируем по дате для графика (от старых к новым)
     loadedHistory.sort((a, b) => a.key.compareTo(b.key));
 
     setState(() {
@@ -134,7 +177,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
       int currentSteps = totalSystemSteps - _savedBaseSteps;
       int finalSteps = currentSteps < 0 ? 0 : currentSteps;
 
-      // Проверяем достижение цели для визуального/звукового уведомления
       if (finalSteps >= _dailyGoal && !_goalAchievedShown) {
         _goalAchievedShown = true;
         _showGoalAchievedDialog();
@@ -147,6 +189,58 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }).onError((error) {
       setState(() => _status = 'Датчик шагов недоступен');
     });
+  }
+
+  // Окно изменения ежедневной цели
+  void _showEditGoalDialog() {
+    TextEditingController goalController = TextEditingController(text: _dailyGoal.toString());
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF23232F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Изменить цель шагов', style: TextStyle(color: Colors.white, fontSize: 18)),
+        content: TextField(
+          controller: goalController,
+          keyboardType: TextInputType.number,
+          style: const TextStyle(color: Colors.white, fontSize: 18),
+          decoration: InputDecoration(
+            hintText: 'Введите число шагов',
+            hintStyle: const TextStyle(color: Colors.white38),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.white24),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF00FF87)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              int? newGoal = int.tryParse(goalController.text);
+              if (newGoal != null && newGoal > 0) {
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                await prefs.setInt('daily_goal', newGoal);
+                setState(() {
+                  _dailyGoal = newGoal;
+                });
+              }
+              if (!mounted) return;
+              Navigator.pop(context);
+            },
+            child: const Text('Сохранить', style: TextStyle(color: Color(0xFF00FF87), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showGoalAchievedDialog() {
@@ -281,80 +375,110 @@ class _PedometerScreenState extends State<PedometerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Шапка с целью
+                // Шапка с погодой и кликабельной целью
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'ШАГОМЕР',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      children: [
+                        Icon(_weatherIcon, color: const Color(0xFF60EFFF), size: 20),
+                        const SizedBox(width: 6),
+                        Text(
+                          _weatherInfo,
+                          style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF23232F),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white10),
-                      ),
-                      child: Text(
-                        'Цель: $_dailyGoal',
-                        style: const TextStyle(color: Color(0xFF00FF87), fontSize: 12, fontWeight: FontWeight.bold),
+                    GestureDetector(
+                      onTap: _showEditGoalDialog,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF23232F),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF00FF87).withOpacity(0.5)),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Цель: $_dailyGoal',
+                              style: const TextStyle(color: Color(0xFF00FF87), fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.edit_rounded, size: 12, color: Color(0xFF00FF87)),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
                 
-                // Главный круг со счетчиком и прогрессом цели
+                // Главный цветной переливающийся круг со счетчиком
                 Stack(
                   alignment: Alignment.center,
                   children: [
                     SizedBox(
-                      width: 170,
-                      height: 170,
+                      width: 190,
+                      height: 190,
                       child: CircularProgressIndicator(
                         value: progress,
-                        strokeWidth: 8,
-                        backgroundColor: Colors.white10,
+                        strokeWidth: 9,
+                        backgroundColor: Colors.white12,
                         valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00FF87)),
                       ),
                     ),
                     Container(
-                      width: 150,
-                      height: 150,
-                      decoration: const BoxDecoration(
+                      width: 170,
+                      height: 170,
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Color(0xFF16161E),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.directions_walk_rounded, size: 26, color: Color(0xFF00FF87)),
-                          const SizedBox(height: 2),
-                          Text(
-                            '$_steps',
-                            style: const TextStyle(
-                              fontSize: 38,
-                              fontWeight: FontWeight.bold,
-                              height: 1.0,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'ШАГОВ',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.5,
-                              color: Colors.white54,
-                            ),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF00FF87), Color(0xFF60EFFF)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF00FF87).withOpacity(0.35),
+                            blurRadius: 25,
+                            spreadRadius: 2,
                           ),
                         ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(5.0),
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFF16161E),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.directions_walk_rounded, size: 30, color: Color(0xFF00FF87)),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$_steps',
+                                style: const TextStyle(
+                                  fontSize: 42,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.0,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'ШАГОВ',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1.5,
+                                  color: Colors.white54,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -371,7 +495,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                         const Color(0xFF60EFFF)
                       )
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: _buildStatCard(
                         Icons.local_fire_department_rounded, 
@@ -383,12 +507,12 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // График статистики по дням
+                // График активности по дням с вызовом календаря
                 GestureDetector(
                   onTap: _showCalendarPicker,
                   child: Container(
-                    height: 125,
-                    padding: const EdgeInsets.all(10),
+                    height: 130,
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: const Color(0xFF23232F),
                       borderRadius: BorderRadius.circular(16),
@@ -424,7 +548,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                                           getTitlesWidget: (value, meta) {
                                             int index = value.toInt();
                                             if (index >= 0 && index < _history.length) {
-                                              // Показываем только день/месяц для компактности
                                               String date = _history[index].key.substring(0, 5);
                                               return Padding(
                                                 padding: const EdgeInsets.only(top: 4.0),
@@ -468,7 +591,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                 // Кнопка сброса
                 Container(
                   width: double.infinity,
-                  height: 46,
+                  height: 48,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFFF416C), Color(0xFFFF4B2B)],
@@ -510,7 +633,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   Widget _buildStatCard(IconData icon, String title, String value, Color iconColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF23232F),
         borderRadius: BorderRadius.circular(16),
@@ -518,20 +641,20 @@ class _PedometerScreenState extends State<PedometerScreen> {
       ),
       child: Row(
         children: [
-          Icon(icon, color: iconColor, size: 22),
-          const SizedBox(width: 8),
+          Icon(icon, color: iconColor, size: 26),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 10, color: Colors.white54),
+                  style: const TextStyle(fontSize: 11, color: Colors.white54),
                 ),
               ],
             ),
