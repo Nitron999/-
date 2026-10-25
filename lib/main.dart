@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:intl/intl.dart'; // Для красивого форматирования даты и времени
+import 'package:intl/intl.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,7 +16,7 @@ class PedometerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Zhigomer',
+      title: 'Шагомер',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F0F13),
         appBarTheme: const AppBarTheme(
@@ -44,7 +44,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _currentTotalSteps = 0;
   bool _hasPermission = false;
 
-  // Переменные для даты и времени старта
   String _startDateStr = '-';
   String _startTimeStr = '-';
 
@@ -99,7 +98,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
       
       _currentTotalSteps = event.steps;
 
-      // Привязка точки отсчета и времени при первом запуске или сбросе
       if (_savedBaseSteps == -1 || _currentTotalSteps < _savedBaseSteps) {
         _saveSessionData(_currentTotalSteps);
       }
@@ -147,7 +145,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Text(
-                    'PEDOMETER',
+                    'ШАГОМЕР',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
@@ -155,7 +153,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 30),
                   
                   Container(
                     width: 280,
@@ -197,7 +195,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                               ),
                             ),
                             const Text(
-                              'STEPS',
+                              'ШАГОВ',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -211,21 +209,21 @@ class _PedometerScreenState extends State<PedometerScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 20),
                   Text(
                     _status,
                     style: const TextStyle(color: Colors.white70, fontSize: 14),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 25),
 
-                  // Карточки статистики: Дистанция + Калории
+                  // Карточки: Дистанция и Калории
                   Row(
                     children: [
                       Expanded(
                         child: _buildStatCard(
                           Icons.route_rounded, 
-                          'Distance', 
-                          '${distanceKm.toStringAsFixed(2)} km\n$distanceMeters m', 
+                          'Дистанция', 
+                          '${distanceKm.toStringAsFixed(2)} км\n$distanceMeters м', 
                           const Color(0xFF60EFFF)
                         )
                       ),
@@ -233,8 +231,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       Expanded(
                         child: _buildStatCard(
                           Icons.local_fire_department_rounded, 
-                          'Calories', 
-                          '$calories kcal\n', 
+                          'Калории', 
+                          '$calories ккал\n', 
                           const Color(0xFFFF512F)
                         )
                       ),
@@ -243,13 +241,13 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   
                   const SizedBox(height: 16),
 
-                  // Карточки времени и даты старта движения
+                  // Карточки: Дата старта и Время старта
                   Row(
                     children: [
                       Expanded(
                         child: _buildStatCard(
                           Icons.calendar_today_rounded, 
-                          'Start Date', 
+                          'Дата старта', 
                           _startDateStr, 
                           const Color(0xFF00FF87)
                         )
@@ -258,7 +256,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       Expanded(
                         child: _buildStatCard(
                           Icons.access_time_rounded, 
-                          'Start Time', 
+                          'Время старта', 
                           _startTimeStr, 
                           const Color(0xFFFFA500)
                         )
@@ -268,19 +266,39 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   
                   const SizedBox(height: 30),
                   
-                  ElevatedButton(
-                    onPressed: _hasPermission ? _resetCounter : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2A2A35),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      minimumSize: const Size(double.infinity, 60),
-                      elevation: 0,
+                  // Кнопка сброса с измененным цветом (акцентный градиент / красный оттенок)
+                  Container(
+                    width: double.infinity,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF416C), Color(0xFFFF4B2B)],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFF4B2B).withOpacity(0.4),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
                     ),
-                    child: const Text(
-                      'RESET STEP COUNTER',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
+                    child: ElevatedButton(
+                      onPressed: _hasPermission ? _resetCounter : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Text(
+                        'СБРОСИТЬ СЧЕТЧИК',
+                        style: TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold, 
+                          letterSpacing: 1.2,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ],
