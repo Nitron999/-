@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +45,10 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _currentTotalSteps = 0;
   bool _hasPermission = false;
 
+  // Переменные для карты
+  LatLng? _currentPosition;
+  final MapController _mapController = MapController();
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +63,24 @@ class _PedometerScreenState extends State<PedometerScreen> {
       _initPedometer();
     } else {
       setState(() => _status = 'Нет разрешения на датчик');
+    }
+    
+    // Запрашиваем геолокацию для карты
+    _initLocation();
+  }
+
+  Future<void> _initLocation() async {
+    LocationPermission permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+      Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 5)
+      ).listen((Position position) {
+        if (!mounted) return;
+        setState(() {
+          _currentPosition = LatLng(position.latitude, position.longitude);
+        });
+        _mapController.move(_currentPosition!, 16.0);
+      });
     }
   }
 
@@ -97,7 +122,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   void _resetCounter() {
     if (_currentTotalSteps > 0) {
-      // Сохраняем текущее системное значение как новый ноль
       _saveBaseSteps(_currentTotalSteps);
       setState(() {
         _steps = 0;
@@ -140,7 +164,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                   const SizedBox(height: 40),
                   
-                  // Круговой индикатор шагов
                   Container(
                     width: 280,
                     height: 280,
@@ -202,7 +225,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                   const SizedBox(height: 30),
 
-                  // Карточки статистики с метрами
                   Row(
                     children: [
                       Expanded(
@@ -225,9 +247,56 @@ class _PedometerScreenState extends State<PedometerScreen> {
                     ],
                   ),
                   
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
                   
-                  // Кнопка сброса
+                  // Блок с картой
+                  Container(
+                    height: 250,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF23232F),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: _currentPosition == null
+                        ? const Center(
+                            child: Text(
+                              'Поиск спутников GPS...',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          )
+                        : FlutterMap(
+                            mapController: _mapController,
+                            options: MapOptions(
+                              initialCenter: _currentPosition!,
+                              initialZoom: 16.0,
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.zhigomer.app',
+                              ),
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: _currentPosition!,
+                                    width: 40,
+                                    height: 40,
+                                    child: const Icon(
+                                      Icons.location_on, 
+                                      color: Colors.redAccent, 
+                                      size: 40
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
                   ElevatedButton(
                     onPressed: _hasPermission ? _resetCounter : null,
                     style: ElevatedButton.styleFrom(
