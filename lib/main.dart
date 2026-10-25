@@ -94,10 +94,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
     await _fetchWeatherForCity(savedCity);
   }
 
-  // Поиск координат города и погоды через свободные API
   Future<void> _fetchWeatherForCity(String cityName) async {
     try {
-      // 1. Геокодируем название города в широту и долготу
       final geoResponse = await http.get(
         Uri.parse('https://geocoding-api.open-meteo.com/v1/search?name=$cityName&count=1&language=ru&format=json')
       ).timeout(const Duration(seconds: 5));
@@ -109,7 +107,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
           final lon = geoData['results'][0]['longitude'];
           final realName = geoData['results'][0]['name'];
 
-          // 2. Получаем погоду по найденным координатам
           final weatherResponse = await http.get(
             Uri.parse('https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code')
           ).timeout(const Duration(seconds: 5));
@@ -129,7 +126,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
         }
       }
       setState(() {
-        _weatherInfo = '$cityName, погода не найдена';
+        _weatherInfo = '$cityName, не найдено';
       });
     } catch (_) {
       setState(() {
@@ -154,7 +151,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     return Icons.cloud_outlined;
   }
 
-  // Окно выбора города
   void _showCityPickerDialog() {
     TextEditingController cityController = TextEditingController(text: _cityName);
 
@@ -274,9 +270,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
       if (finalSteps >= _dailyGoal && !_goalAchievedShown) {
         _goalAchievedShown = true;
-        // Вибрация + Звуковой сигнал достижения цели
         HapticFeedback.heavyImpact();
-        _playGoalSound();
+        _playGoalMelody();
         _showGoalAchievedDialog();
       }
 
@@ -289,9 +284,11 @@ class _PedometerScreenState extends State<PedometerScreen> {
     });
   }
 
-  Future<void> _playGoalSound() async {
+  // Мелодия при достижении цели с гарантированным источником звука
+  Future<void> _playGoalMelody() async {
     try {
-      await _audioPlayer.play(UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'));
+      await _audioPlayer.setVolume(1.0);
+      await _audioPlayer.play(UrlSource('https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg'));
     } catch (_) {}
   }
 
@@ -373,8 +370,13 @@ class _PedometerScreenState extends State<PedometerScreen> {
     );
   }
 
+  // Сброс счетчика с четким звуковым щелчком
   Future<void> _resetCounter() async {
     if (_steps > 0) {
+      // Воспроизведение системного звука щелчка при нажатии
+      SystemSound.play(SystemSoundType.click);
+      HapticFeedback.mediumImpact();
+
       SharedPreferences prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
       final dateFormatted = DateFormat('dd.MM.yyyy').format(now);
@@ -478,7 +480,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Шапка с кликабельной погодой и целью
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -521,7 +522,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
                 
-                // Главный цветной переливающийся круг со счетчиком
                 Stack(
                   alignment: Alignment.center,
                   children: [
@@ -592,7 +592,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // Карточки статистики
                 Row(
                   children: [
                     Expanded(
@@ -615,7 +614,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // График активности по дням с вызовом календаря
                 GestureDetector(
                   onTap: _showCalendarPicker,
                   child: Container(
@@ -696,7 +694,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                 ),
                 
-                // Кнопка сброса
                 Container(
                   width: double.infinity,
                   height: 48,
