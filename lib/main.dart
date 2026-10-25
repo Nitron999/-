@@ -59,7 +59,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _steps = 0;
   int _savedBaseSteps = -1;
   bool _hasPermission = false;
-  int _dailyGoal = 5000; // Цель по умолчанию 5000 шагов
+  int _dailyGoal = 5000;
 
   String _startDateStr = '-';
   String _startTimeStr = '-';
@@ -264,11 +264,13 @@ class _PedometerScreenState extends State<PedometerScreen> {
       int totalSystemSteps = event.steps;
       SharedPreferences prefs = await SharedPreferences.getInstance();
 
+      // Надежная фиксация базы: если базы нет или она сброшена, берем текущие системные шаги
       if (_savedBaseSteps == -1) {
         _savedBaseSteps = totalSystemSteps;
         await prefs.setInt('base_steps', _savedBaseSteps);
       }
 
+      // Защита на случай перезагрузки телефона или сброса счетчика железа
       if (totalSystemSteps < _savedBaseSteps) {
         _savedBaseSteps = totalSystemSteps;
         await prefs.setInt('base_steps', _savedBaseSteps);
@@ -545,7 +547,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
                 
-                // Круг достижения цели: фоновое кольцо красное, а шкала шагов — ярко-зеленая
+                // Главный круг: приглушенный красный фон + ярко-зеленый прогресс шагов
                 Stack(
                   alignment: Alignment.center,
                   children: [
@@ -555,8 +557,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       child: CircularProgressIndicator(
                         value: progress,
                         strokeWidth: 9,
-                        backgroundColor: const Color(0xFFFF4B2B).withOpacity(0.3), // Красный фон кольца
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00FF87)), // Ярко-зеленый прогресс шагов
+                        backgroundColor: const Color(0xFFFF4B2B).withOpacity(0.3),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00FF87)),
                       ),
                     ),
                     Container(
@@ -616,7 +618,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // Супер-широкие, массивные 3D-карточки со скругленными краями и крупным шрифтом
+                // Массивные 3D-карточки
                 Row(
                   children: [
                     Expanded(
@@ -643,7 +645,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // График активности в массивном 3D-стиле
+                // График активности
                 GestureDetector(
                   onTap: _showCalendarPicker,
                   child: Container(
@@ -787,7 +789,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     );
   }
 
-  // Функция для широких, массивных 3D-карточек с крупным шрифтом и идеальным размещением текста
   Widget _buildUltramatic3DCard(IconData icon, String title, String mainValue, String subValue, Color color1, Color color2) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
