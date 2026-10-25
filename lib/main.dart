@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pedometer/pedometer.dart';
@@ -8,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -23,7 +26,113 @@ void main() async {
 
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
+  await initializeBackgroundService();
+
   runApp(const PedometerApp());
+}
+
+// Настройка фоновой службы Android
+Future<void> initializeBackgroundService() async {
+  final service = FlutterBackgroundService();
+
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'pedometer_foreground_channel',
+    'Шагомер Фоновый Сервис',
+    description: 'Удержание счетчика шагов активным в фоне',
+    importance: Importance.low,
+  );
+
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+
+  await service.configure(
+    androidConfiguration: AndroidConfiguration(
+      onStart: onBackgroundServiceStart,
+      autoStart: true,
+      isForegroundMode: true,
+      notificationChannelId: 'pedometer_foreground_channel',
+      initialNotificationTitle: 'Шагомер работает',
+      initialNotificationContent: 'Служба шагов активна в фоне',
+      foregroundServiceNotificationId: 888,
+    ),
+    iosConfiguration: IosConfiguration(),
+  );
+}
+
+// Фоновый поток, работающий при свернутом/заблокированном телефоне
+@pragma('vm:entry-point')
+void onBackgroundServiceStart(ServiceInstance service) async {
+  DartPluginRegistrant.ensureInitialized();
+
+  final FlutterLocalNotificationsPlugin backgroundNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const InitializationSettings initializationSettings =
+      InitializationSettings(android: initializationSettingsAndroid);
+  await backgroundNotifications.initialize(initializationSettings);
+
+  int baseSteps = -1;
+  bool goalSent = false;
+
+  Pedometer.stepCountStream.listen((StepCount event) async {
+    int totalSystemSteps = event.steps;
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    if (baseSteps == -1) {
+      baseSteps = prefs.getInt('base_steps') ?? -1;
+      if (baseSteps == -1) {
+        baseSteps = totalSystemSteps;
+        await prefs.setInt('base_steps', baseSteps);
+      }
+    }
+
+    if (totalSystemSteps < baseSteps) {
+      baseSteps = totalSystemSteps;
+      await prefs.setInt('base_steps', baseSteps);
+    }
+
+    int currentSteps = totalSystemSteps - baseSteps;
+    int finalSteps = currentSteps < 0 ? 0 : currentSteps;
+    int dailyGoal = prefs.getInt('daily_goal') ?? 5000;
+
+    // Проверка достижения цели в фоне
+    if (finalSteps >= dailyGoal && !goalSent) {
+      goalSent = true;
+
+      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+          AndroidNotificationDetails(
+        'pedometer_goal_channel',
+        'Цели шагов',
+        channelDescription: 'Уведомления о достижении ежедневной цели шагов',
+        importance: Importance.max,
+        priority: Priority.high,
+        ticker: 'Цель выполнена!',
+        playSound: true,
+        enableVibration: true,
+      );
+
+      const NotificationDetails platformChannelSpecifics =
+          NotificationDetails(android: androidPlatformChannelSpecifics);
+
+      await backgroundNotifications.show(
+        0,
+        '🎉 Цель выполнена!',
+        'Поздравляем! Вы прошли уже $dailyGoal шагов сегодня!',
+        platformChannelSpecifics,
+      );
+    }
+  });
+
+  service.on('stopService').listen((event) {
+    service.stopSelf();
+  });
 }
 
 class PedometerApp extends StatelessWidget {
@@ -264,13 +373,11 @@ class _PedometerScreenState extends State<PedometerScreen> {
       int totalSystemSteps = event.steps;
       SharedPreferences prefs = await SharedPreferences.getInstance();
 
-      // Надежная фиксация базы: если базы нет или она сброшена, берем текущие системные шаги
       if (_savedBaseSteps == -1) {
         _savedBaseSteps = totalSystemSteps;
         await prefs.setInt('base_steps', _savedBaseSteps);
       }
 
-      // Защита на случай перезагрузки телефона или сброса счетчика железа
       if (totalSystemSteps < _savedBaseSteps) {
         _savedBaseSteps = totalSystemSteps;
         await prefs.setInt('base_steps', _savedBaseSteps);
@@ -547,7 +654,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
                 
-                // Главный круг: приглушенный красный фон + ярко-зеленый прогресс шагов
                 Stack(
                   alignment: Alignment.center,
                   children: [
@@ -618,7 +724,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // Массивные 3D-карточки
                 Row(
                   children: [
                     Expanded(
@@ -645,7 +750,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // График активности
                 GestureDetector(
                   onTap: _showCalendarPicker,
                   child: Container(
@@ -746,7 +850,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                 ),
                 
-                // Кнопка сброса
                 Container(
                   width: double.infinity,
                   height: 48,
