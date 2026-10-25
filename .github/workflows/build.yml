@@ -31,42 +31,33 @@ jobs:
       - name: Generate Android project files
         run: flutter create . --org com.zhigomer.app --project-name zhigomer --platforms=android
 
-      - name: Setup Icon, Name and Gradle
+      - name: Configure Gradle, Name and Icon
         run: |
           echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
           echo "flutter.compileSdkVersion=35" >> android/local.properties
           echo "flutter.targetSdkVersion=35" >> android/local.properties
           
-          # Настраиваем compileSdk = 35 для шагомера
+          # Фиксируем SDK 35 для сборки
           sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdk = 35/g' android/app/build.gradle || true
           
-          # Меняем имя приложения на «Шагомер» в манифесте
+          # Меняем название ярлыка на «Шагомер»
           sed -i 's/android:label="zhigomer"/android:label="Шагомер"/g' android/app/src/main/AndroidManifest.xml || true
           sed -i 's/android:label="@string/app_name"/android:label="Шагомер"/g' android/app/src/main/AndroidManifest.xml || true
 
-          # Добавляем разрешения в Manifest
+          # Прописываем системные разрешения
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />' android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
 
-          # Автоматически скачиваем и устанавливаем иконку с кроссовком для всех разрешений
-          mkdir -p android/app/src/main/res/mipmap-mdpi
-          mkdir -p android/app/src/main/res/mipmap-hdpi
-          mkdir -p android/app/src/main/res/mipmap-xhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxhdpi
-          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+          # Скачиваем чистую иконку кроссовка в корень проекта
+          curl -L "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=512&h=512&fit=crop" -o icon.png
 
-          # Скачиваем картинку кроссовка в качестве иконки приложения
-          curl -L "https://picsum.photos/512" -o android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Install dependencies & Generate Icon
+        run: |
+          flutter pub get
+          flutter pub run flutter_launcher_icons
 
       - name: Build APK
         run: flutter build apk --release
