@@ -41,7 +41,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
   String _status = 'Ожидание первых шагов...';
   int _steps = 0;
   int _savedBaseSteps = -1;
-  int _currentTotalSteps = 0;
   bool _hasPermission = false;
 
   String _startDateStr = '-';
@@ -68,11 +67,25 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   Future<void> _loadSavedData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    
+    final now = DateTime.now();
+    final dateFormatted = DateFormat('dd.MM.yyyy').format(now);
+    final timeFormatted = DateFormat('HH:mm').format(now);
+
+    // Если дата запуска еще не сохранена, записываем текущую
+    String savedDate = prefs.getString('start_date') ?? '';
+    if (savedDate.isEmpty) {
+      await prefs.setString('start_date', dateFormatted);
+      await prefs.setString('start_time', timeFormatted);
+      savedDate = dateFormatted;
+    }
+
     setState(() {
       _savedBaseSteps = prefs.getInt('base_steps') ?? -1;
-      _startDateStr = prefs.getString('start_date') ?? '-';
-      _startTimeStr = prefs.getString('start_time') ?? '-';
+      _startDateStr = savedDate;
+      _startTimeStr = prefs.getString('start_time') ?? timeFormatted;
     });
+    
     await _loadHistory();
   }
 
@@ -96,45 +109,31 @@ class _PedometerScreenState extends State<PedometerScreen> {
     });
   }
 
-  Future<void> _saveSessionData(int base, {int finalSteps = 0}) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    
-    final now = DateTime.now();
-    final dateFormatted = DateFormat('dd.MM.yyyy').format(now);
-    final timeFormatted = DateFormat('HH:mm').format(now);
-
-    if (finalSteps > 0) {
-      String dayKey = 'day_steps_$dateFormatted';
-      int existingSteps = prefs.getInt(dayKey) ?? 0;
-      await prefs.setInt(dayKey, existingSteps + finalSteps);
-    }
-
-    await prefs.setInt('base_steps', base);
-    await prefs.setString('start_date', dateFormatted);
-    await prefs.setString('start_time', timeFormatted);
-
-    setState(() {
-      _savedBaseSteps = base;
-      _startDateStr = dateFormatted;
-      _startTimeStr = timeFormatted;
-    });
-    
-    await _loadHistory();
-  }
-
   void _initPedometer() {
     _stepCountStream = Pedometer.stepCountStream;
-    _stepCountStream.listen((StepCount event) {
+    _stepCountStream.listen((StepCount event) async {
       if (!mounted) return;
       
-      _currentTotalSteps = event.steps;
+      int totalSystemSteps = event.steps;
+      SharedPreferences prefs = await SharedPreferences.getInstance();
 
-      if (_savedBaseSteps == -1 || _currentTotalSteps < _savedBaseSteps) {
-        _saveSessionData(_currentTotalSteps);
+      // Если это самый первый запуск (базовое значение не установлено), 
+      // фиксируем текущее системное значение как точку отсчета (0 шагов)
+      if (_savedBaseSteps == -1) {
+        _savedBaseSteps = totalSystemSteps;
+        await prefs.setInt('base_steps', _savedBaseSteps);
       }
 
+      // Если системный счетчик вдруг перезагрузился (стал меньше базы), обновляем базу
+      if (totalSystemSteps < _savedBaseSteps) {
+        _savedBaseSteps = totalSystemSteps;
+        await prefs.setInt('base_steps', _savedBaseSteps);
+      }
+
+      int currentSteps = totalSystemSteps - _savedBaseSteps;
+
       setState(() {
-        _steps = _currentTotalSteps - _savedBaseSteps;
+        _steps = currentSteps < 0 ? 0 : currentSteps;
         _status = 'Счетчик активен';
       });
     }).onError((error) {
@@ -142,13 +141,37 @@ class _PedometerScreenState extends State<PedometerScreen> {
     });
   }
 
-  void _resetCounter() {
-    if (_currentTotalSteps > 0) {
-      _saveSessionData(_currentTotalSteps, finalSteps: _steps);
+  Future<void> _resetCounter() async {
+    if (_steps > 0) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final dateFormatted = DateFormat('dd.MM.yyyy').format(now);
+      final timeFormatted = DateFormat('HH:mm').format(now);
+
+      // Сохраняем текущий день в историю
+      String dayKey = 'day_steps_$dateFormatted';
+      int existingSteps = prefs.getInt(dayKey) ?? 0;
+      await prefs.setInt(dayKey, existingSteps + _steps);
+
+      // Сбрасываем базу на текущее системное значение, чтобы шаги стали равны 0
+      // (мы не используем getStream() напрямую здесь, а берем последнее событие через сброс базы)
+      // Для надежности обновляем base_steps на текущее значение из стрима или зануляем шаги через смещение:
+      // Проще всего: установим base_steps равным текущему системному значению на следующем тике, 
+      // но здесь просто обнулим через перезапуск базы:
+      
+      // Перезапускаем точку отсчета от текущего системного счетчика
+      // (в следующем событии стрима обнулится)
+      await prefs.setInt('base_steps', -1);
       setState(() {
+        _savedBaseSteps = -1;
         _steps = 0;
-        _status = 'Сброшено. Начинаем заново...';
+        _startDateStr = dateFormatted;
+        _startTimeStr = timeFormatted;
       });
+      await prefs.setString('start_date', dateFormatted);
+      await prefs.setString('start_time', timeFormatted);
+
+      await _loadHistory();
     }
   }
 
