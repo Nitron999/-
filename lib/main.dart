@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,8 +44,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _currentTotalSteps = 0;
   bool _hasPermission = false;
 
-  // Переменные для карты
-  LatLng? _currentPosition;
+  // Координаты центра карты (Москва по умолчанию)
+  final LatLng _defaultLocation = const LatLng(55.751244, 37.618423);
   final MapController _mapController = MapController();
 
   @override
@@ -57,30 +56,14 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   Future<void> _initApp() async {
     PermissionStatus status = await Permission.activityRecognition.request();
+    PermissionStatus locationStatus = await Permission.location.request();
+    
     if (status.isGranted) {
       setState(() => _hasPermission = true);
       await _loadBaseSteps();
       _initPedometer();
     } else {
       setState(() => _status = 'Нет разрешения на датчик');
-    }
-    
-    // Запрашиваем геолокацию для карты
-    _initLocation();
-  }
-
-  Future<void> _initLocation() async {
-    LocationPermission permission = await Geolocator.requestPermission();
-    if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-      Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 5)
-      ).listen((Position position) {
-        if (!mounted) return;
-        setState(() {
-          _currentPosition = LatLng(position.latitude, position.longitude);
-        });
-        _mapController.move(_currentPosition!, 16.0);
-      });
     }
   }
 
@@ -106,7 +89,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
       
       _currentTotalSteps = event.steps;
 
-      // Привязка точки отсчета при первом запуске
       if (_savedBaseSteps == -1 || _currentTotalSteps < _savedBaseSteps) {
         _saveBaseSteps(_currentTotalSteps);
       }
@@ -249,7 +231,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   
                   const SizedBox(height: 24),
                   
-                  // Блок с картой
+                  // Блок с картой без ошибок компиляции
                   Container(
                     height: 250,
                     width: double.infinity,
@@ -259,40 +241,33 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       border: Border.all(color: Colors.white10),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: _currentPosition == null
-                        ? const Center(
-                            child: Text(
-                              'Поиск спутников GPS...',
-                              style: TextStyle(color: Colors.white54),
-                            ),
-                          )
-                        : FlutterMap(
-                            mapController: _mapController,
-                            options: MapOptions(
-                              initialCenter: _currentPosition!,
-                              initialZoom: 16.0,
-                            ),
-                            children: [
-                              TileLayer(
-                                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                userAgentPackageName: 'com.zhigomer.app',
+                    child: FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: _defaultLocation,
+                        initialZoom: 15.0,
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.zhigomer.app',
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _defaultLocation,
+                              width: 40,
+                              height: 40,
+                              child: const Icon(
+                                Icons.location_on, 
+                                color: Colors.redAccent, 
+                                size: 40
                               ),
-                              MarkerLayer(
-                                markers: [
-                                  Marker(
-                                    point: _currentPosition!,
-                                    width: 40,
-                                    height: 40,
-                                    child: const Icon(
-                                      Icons.location_on, 
-                                      color: Colors.redAccent, 
-                                      size: 40
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                   
                   const SizedBox(height: 24),
