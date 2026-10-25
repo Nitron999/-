@@ -29,12 +29,11 @@ jobs:
       - name: Install Android SDK 35
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35"
 
-      - name: Patch AndroidManifest & Configure SDK 35
+      - name: Patch SDK Versions and Permissions
         run: |
+          sed -i 's/flutter.compileSdkVersion/35/g' android/app/build.gradle
+          sed -i 's/flutter.targetSdkVersion/35/g' android/app/build.gradle
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />' android/app/src/main/AndroidManifest.xml
-          echo "flutter.compileSdkVersion=35" >> android/local.properties
-          echo "flutter.targetSdkVersion=35" >> android/local.properties
-          echo "flutter.minSdkVersion=21" >> android/local.properties
 
       - name: Install dependencies
         run: flutter pub get
