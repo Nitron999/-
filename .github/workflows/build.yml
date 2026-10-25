@@ -37,7 +37,7 @@ jobs:
           echo "flutter.compileSdkVersion=35" >> android/local.properties
           echo "flutter.targetSdkVersion=35" >> android/local.properties
           
-          # Фиксируем SDK 35 для сборки
+          # Фиксируем SDK 35 для шагомера
           sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdk = 35/g' android/app/build.gradle || true
           
           # Меняем название ярлыка на «Шагомер»
@@ -51,13 +51,22 @@ jobs:
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' android/app/src/main/AndroidManifest.xml
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' android/app/src/main/AndroidManifest.xml
 
-          # Скачиваем чистую иконку кроссовка в корень проекта
-          curl -L "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=512&h=512&fit=crop" -o icon.png
+          # Создаем папки для иконок Android
+          mkdir -p android/app/src/main/res/mipmap-mdpi
+          mkdir -p android/app/src/main/res/mipmap-hdpi
+          mkdir -p android/app/src/main/res/mipmap-xhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android/app/src/main/res/mipmap-xxxhdpi
 
-      - name: Install dependencies & Generate Icon
-        run: |
-          flutter pub get
-          flutter pub run flutter_launcher_icons
+          # Скачиваем иконку кроссовка и раскладываем по системным папкам
+          curl -L "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=512&h=512&fit=crop" -o android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          cp android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+
+      - name: Install dependencies
+        run: flutter pub get
 
       - name: Build APK
         run: flutter build apk --release
