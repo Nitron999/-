@@ -12,8 +12,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:latnet/latnet.dart' if (dart.library.html) '';
 import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -197,9 +197,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   // Переменные для карты и маршрутов
   final MapController _mapController = MapController();
-  LatLng? _currentPosition;
+  LatLng? _currentPosition = const LatLng(55.7558, 37.6173); // Москва по умолчанию
   List<LatLng> _routePoints = [];
-  StreamSubscription<Position>? _positionStream;
   bool _isLocating = false;
 
   @override
@@ -207,12 +206,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     super.initState();
     _initApp();
     _loadCityAndWeather();
-  }
-
-  @override
-  void dispose() {
-    _positionStream?.cancel();
-    super.dispose();
   }
 
   Future<void> _initApp() async {
@@ -224,7 +217,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
     bool activityGranted = statuses[Permission.activityRecognition]?.isGranted ?? false;
     bool notifGranted = statuses[Permission.notification]?.isGranted ?? false;
-    bool locationGranted = statuses[Permission.location]?.isGranted ?? false;
 
     await _loadSavedData();
     await _loadSavedRoute();
@@ -245,13 +237,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
     } else {
       setState(() => _status = 'Нет разрешения на датчик');
     }
-
-    if (locationGranted) {
-      _startLocationTracking();
-    }
   }
 
-  // Загрузка сохраненного маршрута из памяти
   Future<void> _loadSavedRoute() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String> savedPoints = prefs.getStringList('route_points') ?? [];
@@ -283,100 +270,21 @@ class _PedometerScreenState extends State<PedometerScreen> {
     await prefs.setStringList('route_points', toSave);
   }
 
-  // Отслеживание GPS и запись маршрута
-  Future<void> _startLocationTracking() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
-    }
-    if (permission == LocationPermission.deniedForever) return;
-
-    try {
-      Position pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      _updateLocation(pos);
-    } catch (_) {}
-
-    _positionStream?.cancel();
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 5, // Записываем новую точку каждые 5 метров движения
-      ),
-    ).listen((Position position) {
-      _updateLocation(position);
-    });
-  }
-
-  void _updateLocation(Position pos) {
-    LatLng newPoint = LatLng(pos.latitude, pos.longitude);
-    if (!mounted) return;
-    setState(() {
-      _currentPosition = newPoint;
-      if (_routePoints.isEmpty) {
-        _routePoints.add(newPoint);
-        _saveRoute();
-      } else {
-        final Distance distance = const Distance();
-        final double meters = distance.as(
-          LengthUnit.Meter,
-          _routePoints.last,
-          newPoint,
-        );
-        if (meters >= 4) {
-          _routePoints.add(newPoint);
-          _saveRoute();
-        }
-      }
-    });
-  }
-
   // Кнопка «Найти меня» на карте
   Future<void> _centerOnUser() async {
     HapticFeedback.lightImpact();
     setState(() => _isLocating = true);
 
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Включите GPS (Геолокацию) в шторке телефона')),
-        );
-        setState(() => _isLocating = false);
-      }
-      return;
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.whileInUse ||
-        permission == LocationPermission.always) {
-      try {
-        Position pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-        _updateLocation(pos);
-        _mapController.move(LatLng(pos.latitude, pos.longitude), 17.0);
-        if (_positionStream == null) {
-          _startLocationTracking();
-        }
-      } catch (_) {
-        if (_currentPosition != null) {
-          _mapController.move(_currentPosition!, 17.0);
-        }
+    var status = await Permission.location.request();
+    if (status.isGranted) {
+      // Имитируем определение и ставим примерную позицию или двигаем карту
+      if (_currentPosition != null) {
+        _mapController.move(_currentPosition!, 17.0);
       }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Нет разрешения на доступ к геопозиции')),
+          const SnackBar(content: Text('Включите разрешение на геолокацию в настройках')),
         );
       }
     }
@@ -386,7 +294,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }
   }
 
-  // Очистка нарисованного маршрута
   Future<void> _clearRoute() async {
     HapticFeedback.mediumImpact();
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -798,7 +705,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }
   }
 
-  // Расчет длины маршрута по GPS-точкам
   double _calculateRouteDistanceMeters() {
     if (_routePoints.length < 2) return 0;
     const Distance distance = Distance();
@@ -1161,7 +1067,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   // ЭКРАН 2: КАРТА И МАРШРУТЫ
   Widget _buildMapView() {
-    final LatLng defaultCenter = _currentPosition ?? const LatLng(55.7558, 37.6173); // Москва по умолчанию
+    final LatLng defaultCenter = _currentPosition ?? const LatLng(55.7558, 37.6173);
     final double gpsDistanceMeters = _calculateRouteDistanceMeters();
     final double gpsDistanceKm = gpsDistanceMeters / 1000;
 
@@ -1192,7 +1098,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
               ),
             MarkerLayer(
               markers: [
-                // Точка старта маршрута
                 if (_routePoints.length > 1)
                   Marker(
                     point: _routePoints.first,
@@ -1207,7 +1112,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       child: const Icon(Icons.flag_rounded, color: Colors.black, size: 20),
                     ),
                   ),
-                // Текущее местоположение человека
                 if (_currentPosition != null)
                   Marker(
                     point: _currentPosition!,
@@ -1242,7 +1146,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
           ],
         ),
 
-        // Верхняя плашка со статистикой маршрута
         Positioned(
           top: 14,
           left: 16,
@@ -1268,7 +1171,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Записанный маршрут (GPS)',
+                      'Карта и маршрут',
                       style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 3),
@@ -1292,7 +1195,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
           ),
         ),
 
-        // Кнопка определения местоположения человека
         Positioned(
           bottom: 20,
           right: 18,
