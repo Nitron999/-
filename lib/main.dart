@@ -12,7 +12,6 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latnet/latnet.dart' if (dart.library.html) '';
 import 'package:latlong2/latlong.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -277,7 +276,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
     var status = await Permission.location.request();
     if (status.isGranted) {
-      // Имитируем определение и ставим примерную позицию или двигаем карту
       if (_currentPosition != null) {
         _mapController.move(_currentPosition!, 17.0);
       }
