@@ -59,7 +59,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _steps = 0;
   int _savedBaseSteps = -1;
   bool _hasPermission = false;
-  int _dailyGoal = 5000; // Цель по умолчанию строго 5000 шагов
+  int _dailyGoal = 5000; // Цель по умолчанию 5000 шагов
 
   String _startDateStr = '-';
   String _startTimeStr = '-';
@@ -302,6 +302,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
       importance: Importance.max,
       priority: Priority.high,
       ticker: 'Цель выполнена!',
+      playSound: true,
+      enableVibration: true,
     );
 
     const NotificationDetails platformChannelSpecifics =
@@ -543,7 +545,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
                 
-                // Главный круг с огненным/красным градиентом
+                // Круг достижения цели: фоновое кольцо красное, а шкала шагов — ярко-зеленая
                 Stack(
                   alignment: Alignment.center,
                   children: [
@@ -553,8 +555,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       child: CircularProgressIndicator(
                         value: progress,
                         strokeWidth: 9,
-                        backgroundColor: Colors.white12,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF4B2B)),
+                        backgroundColor: const Color(0xFFFF4B2B).withOpacity(0.3), // Красный фон кольца
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00FF87)), // Ярко-зеленый прогресс шагов
                       ),
                     ),
                     Container(
@@ -565,12 +567,12 @@ class _PedometerScreenState extends State<PedometerScreen> {
                         gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFFFF512F), Color(0xFFFF4B2B)],
+                          colors: [Color(0xFF23232F), Color(0xFF16161E)],
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFFF4B2B).withOpacity(0.4),
-                            blurRadius: 25,
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: 20,
                             spreadRadius: 2,
                           ),
                         ],
@@ -585,7 +587,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.directions_walk_rounded, size: 30, color: Color(0xFFFF4B2B)),
+                              const Icon(Icons.directions_walk_rounded, size: 30, color: Color(0xFF00FF87)),
                               const SizedBox(height: 2),
                               Text(
                                 '$_steps',
@@ -614,7 +616,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // Супер-объемные 3D-карточки со скругленными краями и увеличенным шрифтом
+                // Супер-широкие, массивные 3D-карточки со скругленными краями и крупным шрифтом
                 Row(
                   children: [
                     Expanded(
@@ -641,7 +643,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // График активности в массивном 3D-стиле со скругленными краями
+                // График активности в массивном 3D-стиле
                 GestureDetector(
                   onTap: _showCalendarPicker,
                   child: Container(
@@ -785,10 +787,10 @@ class _PedometerScreenState extends State<PedometerScreen> {
     );
   }
 
-  // Функция для создания ультра-объемных 3D-карточек с исправленным размером текста и сильным скруглением
+  // Функция для широких, массивных 3D-карточек с крупным шрифтом и идеальным размещением текста
   Widget _buildUltramatic3DCard(IconData icon, String title, String mainValue, String subValue, Color color1, Color color2) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: const Color(0xFF23232F),
         borderRadius: BorderRadius.circular(24),
@@ -827,7 +829,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
             ),
             child: Icon(icon, color: Colors.white, size: 28),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -838,24 +840,24 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     mainValue,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
                 if (subValue.isNotEmpty) ...[
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text(
                       subValue,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white70),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white70),
                     ),
                   ),
                 ],
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w500),
+                  style: const TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
