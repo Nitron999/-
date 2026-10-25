@@ -1,0 +1,17 @@
+name: zhigomer
+description: "Hardcore Pedometer"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  pedometer: ^4.0.1
+  shared_preferences: ^2.2.2
+  permission_handler: ^11.3.0
+
+flutter:
+  uses-material-design: true
