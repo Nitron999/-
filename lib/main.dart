@@ -72,7 +72,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     final dateFormatted = DateFormat('dd.MM.yyyy').format(now);
     final timeFormatted = DateFormat('HH:mm').format(now);
 
-    // Если дата запуска еще не сохранена, записываем текущую
     String savedDate = prefs.getString('start_date') ?? '';
     if (savedDate.isEmpty) {
       await prefs.setString('start_date', dateFormatted);
@@ -117,14 +116,11 @@ class _PedometerScreenState extends State<PedometerScreen> {
       int totalSystemSteps = event.steps;
       SharedPreferences prefs = await SharedPreferences.getInstance();
 
-      // Если это самый первый запуск (базовое значение не установлено), 
-      // фиксируем текущее системное значение как точку отсчета (0 шагов)
       if (_savedBaseSteps == -1) {
         _savedBaseSteps = totalSystemSteps;
         await prefs.setInt('base_steps', _savedBaseSteps);
       }
 
-      // Если системный счетчик вдруг перезагрузился (стал меньше базы), обновляем базу
       if (totalSystemSteps < _savedBaseSteps) {
         _savedBaseSteps = totalSystemSteps;
         await prefs.setInt('base_steps', _savedBaseSteps);
@@ -148,19 +144,10 @@ class _PedometerScreenState extends State<PedometerScreen> {
       final dateFormatted = DateFormat('dd.MM.yyyy').format(now);
       final timeFormatted = DateFormat('HH:mm').format(now);
 
-      // Сохраняем текущий день в историю
       String dayKey = 'day_steps_$dateFormatted';
       int existingSteps = prefs.getInt(dayKey) ?? 0;
       await prefs.setInt(dayKey, existingSteps + _steps);
 
-      // Сбрасываем базу на текущее системное значение, чтобы шаги стали равны 0
-      // (мы не используем getStream() напрямую здесь, а берем последнее событие через сброс базы)
-      // Для надежности обновляем base_steps на текущее значение из стрима или зануляем шаги через смещение:
-      // Проще всего: установим base_steps равным текущему системному значению на следующем тике, 
-      // но здесь просто обнулим через перезапуск базы:
-      
-      // Перезапускаем точку отсчета от текущего системного счетчика
-      // (в следующем событии стрима обнулится)
       await prefs.setInt('base_steps', -1);
       setState(() {
         _savedBaseSteps = -1;
@@ -172,6 +159,62 @@ class _PedometerScreenState extends State<PedometerScreen> {
       await prefs.setString('start_time', timeFormatted);
 
       await _loadHistory();
+    }
+  }
+
+  // Функция открытия календаря для выбора дня
+  Future<void> _showCalendarPicker() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    
+    DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF00FF87),
+              onPrimary: Color(0xFF16161E),
+              surface: Color(0xFF23232F),
+              onSurface: Colors.white,
+            ),
+            dialogBackgroundColor: const Color(0xFF1C1C26),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null) {
+      String formattedDate = DateFormat('dd.MM.yyyy').format(pickedDate);
+      String dayKey = 'day_steps_$formattedDate';
+      int stepsForDay = prefs.getInt(dayKey) ?? 0;
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF23232F),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Статистика за $formattedDate',
+            style: const TextStyle(color: Colors.white, fontSize: 18),
+          ),
+          content: Text(
+            'Пройдено шагов: $stepsForDay',
+            style: const TextStyle(color: Color(0xFF00FF87), fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('ОК', style: TextStyle(color: Color(0xFF00FF87), fontSize: 16)),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -284,43 +327,53 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                Container(
-                  height: 100,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF23232F),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white10),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Статистика по дням',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white70),
-                      ),
-                      const SizedBox(height: 6),
-                      Expanded(
-                        child: _history.isEmpty
-                            ? const Center(child: Text('Нет сохраненных дней', style: TextStyle(color: Colors.white38, fontSize: 12)))
-                            : ListView.builder(
-                                itemCount: _history.length,
-                                itemBuilder: (context, index) {
-                                  final item = _history[index];
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 2.0),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(item.key, style: const TextStyle(color: Colors.white60, fontSize: 13)),
-                                        Text('${item.value} шаг.', style: const TextStyle(color: Color(0xFF00FF87), fontWeight: FontWeight.bold, fontSize: 13)),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
+                // Блок статистики с кнопкой вызова календаря
+                GestureDetector(
+                  onTap: _showCalendarPicker,
+                  child: Container(
+                    height: 105,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF23232F),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF00FF87).withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Статистика по дням (выбрать дату)',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white70),
+                            ),
+                            const Icon(Icons.calendar_month_rounded, size: 18, color: Color(0xFF00FF87)),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Expanded(
+                          child: _history.isEmpty
+                              ? const Center(child: Text('Нажмите, чтобы открыть календарь', style: TextStyle(color: Colors.white38, fontSize: 12)))
+                              : ListView.builder(
+                                  itemCount: _history.length,
+                                  itemBuilder: (context, index) {
+                                    final item = _history[index];
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(item.key, style: const TextStyle(color: Colors.white60, fontSize: 13)),
+                                          Text('${item.value} шаг.', style: const TextStyle(color: Color(0xFF00FF87), fontWeight: FontWeight.bold, fontSize: 13)),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 
