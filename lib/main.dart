@@ -3,6 +3,7 @@ import 'package:pedometer/pedometer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,11 +43,13 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _steps = 0;
   int _savedBaseSteps = -1;
   bool _hasPermission = false;
+  int _dailyGoal = 10000; // Цель по умолчанию
 
   String _startDateStr = '-';
   String _startTimeStr = '-';
   
   List<MapEntry<String, int>> _history = [];
+  bool _goalAchievedShown = false;
 
   @override
   void initState() {
@@ -83,6 +86,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
       _savedBaseSteps = prefs.getInt('base_steps') ?? -1;
       _startDateStr = savedDate;
       _startTimeStr = prefs.getString('start_time') ?? timeFormatted;
+      _dailyGoal = prefs.getInt('daily_goal') ?? 10000;
     });
     
     await _loadHistory();
@@ -101,7 +105,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
       }
     }
 
-    loadedHistory.sort((a, b) => b.key.compareTo(a.key));
+    // Сортируем по дате для графика (от старых к новым)
+    loadedHistory.sort((a, b) => a.key.compareTo(b.key));
 
     setState(() {
       _history = loadedHistory;
@@ -127,14 +132,48 @@ class _PedometerScreenState extends State<PedometerScreen> {
       }
 
       int currentSteps = totalSystemSteps - _savedBaseSteps;
+      int finalSteps = currentSteps < 0 ? 0 : currentSteps;
+
+      // Проверяем достижение цели для визуального/звукового уведомления
+      if (finalSteps >= _dailyGoal && !_goalAchievedShown) {
+        _goalAchievedShown = true;
+        _showGoalAchievedDialog();
+      }
 
       setState(() {
-        _steps = currentSteps < 0 ? 0 : currentSteps;
+        _steps = finalSteps;
         _status = 'Счетчик активен';
       });
     }).onError((error) {
       setState(() => _status = 'Датчик шагов недоступен');
     });
+  }
+
+  void _showGoalAchievedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF23232F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.military_tech_rounded, color: Color(0xFF00FF87), size: 32),
+            SizedBox(width: 10),
+            Text('Цель выполнена!', style: TextStyle(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          'Поздравляем! Вы прошли уже $_dailyGoal шагов сегодня!',
+          style: const TextStyle(color: Colors.white70, fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Круто!', style: TextStyle(color: Color(0xFF00FF87), fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _resetCounter() async {
@@ -154,6 +193,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
         _steps = 0;
         _startDateStr = dateFormatted;
         _startTimeStr = timeFormatted;
+        _goalAchievedShown = false;
       });
       await prefs.setString('start_date', dateFormatted);
       await prefs.setString('start_time', timeFormatted);
@@ -162,7 +202,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }
   }
 
-  // Функция открытия календаря для выбора дня
   Future<void> _showCalendarPicker() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     
@@ -223,6 +262,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
     int distanceMeters = (_steps * 0.75).round();
     double distanceKm = distanceMeters / 1000;
     int calories = (_steps * 0.04).round();
+    
+    double progress = (_steps / _dailyGoal).clamp(0.0, 1.0);
 
     return Scaffold(
       body: Container(
@@ -235,42 +276,56 @@ class _PedometerScreenState extends State<PedometerScreen> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Text(
-                  'ШАГОМЕР',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 3,
-                    color: Colors.white,
-                  ),
+                // Шапка с целью
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'ШАГОМЕР',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF23232F),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Text(
+                        'Цель: $_dailyGoal',
+                        style: const TextStyle(color: Color(0xFF00FF87), fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ),
                 
-                Container(
-                  width: 180,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF00FF87), Color(0xFF60EFFF)],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF00FF87).withOpacity(0.25),
-                        blurRadius: 15,
-                        spreadRadius: 2,
+                // Главный круг со счетчиком и прогрессом цели
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 170,
+                      height: 170,
+                      child: CircularProgressIndicator(
+                        value: progress,
+                        strokeWidth: 8,
+                        backgroundColor: Colors.white10,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00FF87)),
                       ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(5.0),
-                    child: Container(
+                    ),
+                    Container(
+                      width: 150,
+                      height: 150,
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         color: Color(0xFF16161E),
@@ -278,12 +333,12 @@ class _PedometerScreenState extends State<PedometerScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.directions_walk_rounded, size: 30, color: Color(0xFF00FF87)),
+                          const Icon(Icons.directions_walk_rounded, size: 26, color: Color(0xFF00FF87)),
                           const SizedBox(height: 2),
                           Text(
                             '$_steps',
                             style: const TextStyle(
-                              fontSize: 42,
+                              fontSize: 38,
                               fontWeight: FontWeight.bold,
                               height: 1.0,
                               color: Colors.white,
@@ -293,7 +348,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                           const Text(
                             'ШАГОВ',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 1.5,
                               color: Colors.white54,
@@ -302,9 +357,10 @@ class _PedometerScreenState extends State<PedometerScreen> {
                         ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
 
+                // Карточки статистики
                 Row(
                   children: [
                     Expanded(
@@ -327,12 +383,12 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // Блок статистики с кнопкой вызова календаря
+                // График статистики по дням
                 GestureDetector(
                   onTap: _showCalendarPicker,
                   child: Container(
-                    height: 105,
-                    padding: const EdgeInsets.all(12),
+                    height: 125,
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: const Color(0xFF23232F),
                       borderRadius: BorderRadius.circular(16),
@@ -341,35 +397,67 @@ class _PedometerScreenState extends State<PedometerScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Статистика по дням (выбрать дату)',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white70),
+                            Text(
+                              'График активности (нажмите для календаря)',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
                             ),
-                            const Icon(Icons.calendar_month_rounded, size: 18, color: Color(0xFF00FF87)),
+                            Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFF00FF87)),
                           ],
                         ),
                         const SizedBox(height: 6),
                         Expanded(
                           child: _history.isEmpty
-                              ? const Center(child: Text('Нажмите, чтобы открыть календарь', style: TextStyle(color: Colors.white38, fontSize: 12)))
-                              : ListView.builder(
-                                  itemCount: _history.length,
-                                  itemBuilder: (context, index) {
-                                    final item = _history[index];
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 2.0),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(item.key, style: const TextStyle(color: Colors.white60, fontSize: 13)),
-                                          Text('${item.value} шаг.', style: const TextStyle(color: Color(0xFF00FF87), fontWeight: FontWeight.bold, fontSize: 13)),
-                                        ],
+                              ? const Center(child: Text('Нет данных для графика', style: TextStyle(color: Colors.white38, fontSize: 12)))
+                              : BarChart(
+                                  BarChartData(
+                                    alignment: BarChartAlignment.spaceAround,
+                                    maxY: _history.map((e) => e.value.toDouble()).fold(10000.0, (prev, element) => element > prev ? element : prev) * 1.2,
+                                    barTouchData: BarTouchData(enabled: false),
+                                    titlesData: FlTitlesData(
+                                      show: true,
+                                      bottomTitles: AxisTitles(
+                                        sideTitles: SideTitles(
+                                          showTitles: true,
+                                          getTitlesWidget: (value, meta) {
+                                            int index = value.toInt();
+                                            if (index >= 0 && index < _history.length) {
+                                              // Показываем только день/месяц для компактности
+                                              String date = _history[index].key.substring(0, 5);
+                                              return Padding(
+                                                padding: const EdgeInsets.only(top: 4.0),
+                                                child: Text(date, style: const TextStyle(color: Colors.white54, fontSize: 9)),
+                                              );
+                                            }
+                                            return const Text('');
+                                          },
+                                          reservedSize: 20,
+                                        ),
                                       ),
-                                    );
-                                  },
+                                      leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    ),
+                                    gridData: const FlGridData(show: false),
+                                    borderData: FlBorderData(show: false),
+                                    barGroups: _history.asMap().entries.map((entry) {
+                                      int index = entry.key;
+                                      int steps = entry.value.value;
+                                      return BarChartGroupData(
+                                        x: index,
+                                        barRods: [
+                                          BarChartRodData(
+                                            toY: steps.toDouble(),
+                                            color: const Color(0xFF00FF87),
+                                            width: 12,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ),
                                 ),
                         ),
                       ],
@@ -377,9 +465,10 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                 ),
                 
+                // Кнопка сброса
                 Container(
                   width: double.infinity,
-                  height: 48,
+                  height: 46,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFFF416C), Color(0xFFFF4B2B)],
@@ -421,7 +510,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
   Widget _buildStatCard(IconData icon, String title, String value, Color iconColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF23232F),
         borderRadius: BorderRadius.circular(16),
@@ -429,20 +518,20 @@ class _PedometerScreenState extends State<PedometerScreen> {
       ),
       child: Row(
         children: [
-          Icon(icon, color: iconColor, size: 24),
-          const SizedBox(width: 10),
+          Icon(icon, color: iconColor, size: 22),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 11, color: Colors.white54),
+                  style: const TextStyle(fontSize: 10, color: Colors.white54),
                 ),
               ],
             ),
