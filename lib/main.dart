@@ -17,6 +17,10 @@ class PedometerApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F0F13),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
       ),
       home: const PedometerScreen(),
     );
@@ -32,9 +36,10 @@ class PedometerScreen extends StatefulWidget {
 
 class _PedometerScreenState extends State<PedometerScreen> {
   late Stream<StepCount> _stepCountStream;
-  String _status = 'Запуск датчиков...';
+  String _status = 'Ожидание первых шагов...';
   int _steps = 0;
   int _savedBaseSteps = -1;
+  int _currentTotalSteps = 0;
   bool _hasPermission = false;
 
   @override
@@ -73,33 +78,38 @@ class _PedometerScreenState extends State<PedometerScreen> {
     _stepCountStream = Pedometer.stepCountStream;
     _stepCountStream.listen((StepCount event) {
       if (!mounted) return;
-      int totalBootSteps = event.steps;
-      if (_savedBaseSteps == -1 || totalBootSteps < _savedBaseSteps) {
-        _saveBaseSteps(totalBootSteps);
+      
+      _currentTotalSteps = event.steps;
+
+      // Привязка точки отсчета при первом запуске
+      if (_savedBaseSteps == -1 || _currentTotalSteps < _savedBaseSteps) {
+        _saveBaseSteps(_currentTotalSteps);
       }
+
       setState(() {
-        _steps = totalBootSteps - _savedBaseSteps;
+        _steps = _currentTotalSteps - _savedBaseSteps;
         _status = 'Счетчик активен';
       });
     }).onError((error) {
-      setState(() => _status = 'Датчик шагов не найден');
+      setState(() => _status = 'Датчик шагов недоступен');
     });
   }
 
   void _resetCounter() {
-    setState(() {
-      _savedBaseSteps = -1;
-      _steps = 0;
-      _status = 'Сброшено. Начинаем заново...';
-    });
-    Pedometer.stepCountStream.first.then((event) {
-      _saveBaseSteps(event.steps);
-    });
+    if (_currentTotalSteps > 0) {
+      // Сохраняем текущее системное значение как новый ноль
+      _saveBaseSteps(_currentTotalSteps);
+      setState(() {
+        _steps = 0;
+        _status = 'Сброшено. Начинаем заново...';
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    double distanceKm = (_steps * 0.75) / 1000;
+    int distanceMeters = (_steps * 0.75).round();
+    double distanceKm = distanceMeters / 1000;
     int calories = (_steps * 0.04).round();
 
     return Scaffold(
@@ -119,50 +129,119 @@ class _PedometerScreenState extends State<PedometerScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text('ШАГОМЕР 3000', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
+                  const Text(
+                    'ШАГОМЕР 3000',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                      color: Colors.white,
+                    ),
+                  ),
                   const SizedBox(height: 40),
+                  
+                  // Круговой индикатор шагов
                   Container(
-                    width: 280, height: 280,
+                    width: 280,
+                    height: 280,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(colors: [Color(0xFF00FF87), Color(0xFF60EFFF)]),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF00FF87), Color(0xFF60EFFF)],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00FF87).withOpacity(0.3),
+                          blurRadius: 30,
+                          spreadRadius: 5,
+                        ),
+                      ],
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Container(
-                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF16161E)),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF16161E),
+                        ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(Icons.directions_walk_rounded, size: 48, color: Color(0xFF00FF87)),
-                            Text('$_steps', style: const TextStyle(fontSize: 64, fontWeight: FontWeight.bold, color: Colors.white)),
-                            const Text('ШАГОВ', style: TextStyle(fontSize: 16, color: Colors.white54)),
+                            const SizedBox(height: 10),
+                            Text(
+                              '$_steps',
+                              style: const TextStyle(
+                                fontSize: 64,
+                                fontWeight: FontWeight.bold,
+                                height: 1.0,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const Text(
+                              'ШАГОВ',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.5,
+                                color: Colors.white54,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
+                  
                   const SizedBox(height: 30),
-                  Text(_status, style: const TextStyle(color: Colors.white70)),
+                  Text(
+                    _status,
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
                   const SizedBox(height: 30),
+
+                  // Карточки статистики с метрами
                   Row(
                     children: [
-                      Expanded(child: _buildStatCard(Icons.route_rounded, 'Дистанция', '${distanceKm.toStringAsFixed(2)} км', const Color(0xFF60EFFF))),
+                      Expanded(
+                        child: _buildStatCard(
+                          Icons.route_rounded, 
+                          'Дистанция', 
+                          '${distanceKm.toStringAsFixed(2)} км\n$distanceMeters м', 
+                          const Color(0xFF60EFFF)
+                        )
+                      ),
                       const SizedBox(width: 16),
-                      Expanded(child: _buildStatCard(Icons.local_fire_department_rounded, 'Калории', '$calories ккал', const Color(0xFFFF512F))),
+                      Expanded(
+                        child: _buildStatCard(
+                          Icons.local_fire_department_rounded, 
+                          'Калории', 
+                          '$calories ккал\n', 
+                          const Color(0xFFFF512F)
+                        )
+                      ),
                     ],
                   ),
+                  
                   const SizedBox(height: 40),
+                  
+                  // Кнопка сброса
                   ElevatedButton(
                     onPressed: _hasPermission ? _resetCounter : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2A2A35),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      minimumSize: const Size(double.infinity, 60),
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      minimumSize: const Size(double.infinity, 60),
+                      elevation: 0,
                     ),
-                    child: const Text('СБРОСИТЬ СЧЕТЧИК', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'СБРОСИТЬ СЧЕТЧИК',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
+                    ),
                   ),
                 ],
               ),
@@ -176,14 +255,25 @@ class _PedometerScreenState extends State<PedometerScreen> {
   Widget _buildStatCard(IconData icon, String title, String value, Color iconColor) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: const Color(0xFF23232F), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: const Color(0xFF23232F),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: iconColor, size: 32),
           const SizedBox(height: 16),
-          Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-          Text(title, style: const TextStyle(fontSize: 14, color: Colors.white54)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white, height: 1.3),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 14, color: Colors.white54),
+          ),
         ],
       ),
     );
