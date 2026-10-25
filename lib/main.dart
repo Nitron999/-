@@ -7,7 +7,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
-import 'package:audioplayers/audioplayers.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,19 +58,11 @@ class _PedometerScreenState extends State<PedometerScreen> {
   String _weatherInfo = 'Загрузка...';
   IconData _weatherIcon = Icons.wb_sunny_rounded;
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
-
   @override
   void initState() {
     super.initState();
     _initApp();
     _loadCityAndWeather();
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
   }
 
   Future<void> _initApp() async {
@@ -240,7 +231,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
       }
     }
 
-    loadedHistory.sort((a, b) => a.key.compareTo(b.key));
+    loadedHistory.sort((a, b) => b.key.compareTo(b.key));
 
     setState(() {
       _history = loadedHistory;
@@ -270,8 +261,9 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
       if (finalSteps >= _dailyGoal && !_goalAchievedShown) {
         _goalAchievedShown = true;
-        HapticFeedback.heavyImpact();
-        _playGoalMelody();
+        // Гарантированный системный звук и мощная вибрация при достижении цели
+        SystemSound.play(SystemSoundType.alert);
+        HapticFeedback.vibrate();
         _showGoalAchievedDialog();
       }
 
@@ -282,14 +274,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }).onError((error) {
       setState(() => _status = 'Датчик шагов недоступен');
     });
-  }
-
-  // Мелодия при достижении цели с гарантированным источником звука
-  Future<void> _playGoalMelody() async {
-    try {
-      await _audioPlayer.setVolume(1.0);
-      await _audioPlayer.play(UrlSource('https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg'));
-    } catch (_) {}
   }
 
   void _showEditGoalDialog() {
@@ -370,10 +354,9 @@ class _PedometerScreenState extends State<PedometerScreen> {
     );
   }
 
-  // Сброс счетчика с четким звуковым щелчком
+  // Сброс счетчика с четким системным щелчком и вибрацией
   Future<void> _resetCounter() async {
     if (_steps > 0) {
-      // Воспроизведение системного звука щелчка при нажатии
       SystemSound.play(SystemSoundType.click);
       HapticFeedback.mediumImpact();
 
