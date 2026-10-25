@@ -154,7 +154,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ),
                 ),
                 
-                // Главный круг со счетчиком (аккуратно уменьшен для экрана)
+                // Главный круг со счетчиком
                 Container(
                   width: 210,
                   height: 210,
@@ -269,7 +269,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                     gradient: const LinearGradient(
                       colors: [Color(0xFFFF416C), Color(0xFFFF4B2B)],
                     ),
-                    borderRadius: BorderRadius.resolveWith((_) => BorderRadius.circular(14)) ?? BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
                         color: const Color(0xFFFF4B2B).withOpacity(0.3),
