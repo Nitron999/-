@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart'; // Стабильный импорт напрямую
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +45,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _currentTotalSteps = 0;
   bool _hasPermission = false;
 
-  LatLng _currentLocation = const LatLng(55.751244, 37.618423); // Москва по умолчанию
+  LatLng _currentLocation = const LatLng(55.751244, 37.618423);
   final MapController _mapController = MapController();
   bool _isLocating = false;
 
@@ -68,7 +68,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }
   }
 
-  // Реальное определение координат по нажатию на кнопку
   Future<void> _getCurrentLocation() async {
     setState(() => _isLocating = true);
     try {
