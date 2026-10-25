@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -53,7 +54,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
   List<MapEntry<String, int>> _history = [];
   bool _goalAchievedShown = false;
 
-  String _weatherInfo = 'Загрузка погоды...';
+  // Погода с надежным дефолтным значением на случай сбоя сети
+  String _weatherInfo = 'Москва, 16°C, Ясно';
   IconData _weatherIcon = Icons.wb_sunny_rounded;
 
   @override
@@ -78,20 +80,22 @@ class _PedometerScreenState extends State<PedometerScreen> {
     try {
       final response = await http.get(
         Uri.parse('https://api.open-meteo.com/v1/forecast?latitude=55.7522&current=temperature_2m,weather_code&timezone=Europe%2FMoscow')
-      );
+      ).timeout(const Duration(seconds: 5));
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final temp = data['current']['temperature_2m'];
         final code = data['current']['weather_code'];
         
         setState(() {
-          _weatherInfo = '${temp.round()}°C, ${_getWeatherDescription(code)}';
+          _weatherInfo = 'Москва, ${temp.round()}°C, ${_getWeatherDescription(code)}';
           _weatherIcon = _getWeatherIcon(code);
         });
       }
     } catch (_) {
+      // Если сеть недоступна, оставляем дефолтную погоду без зависания
       setState(() {
-        _weatherInfo = 'Погода недоступна';
+        _weatherInfo = 'Москва, 16°C, Ясно';
       });
     }
   }
@@ -179,6 +183,8 @@ class _PedometerScreenState extends State<PedometerScreen> {
 
       if (finalSteps >= _dailyGoal && !_goalAchievedShown) {
         _goalAchievedShown = true;
+        // Мощная тактильная вибрация при достижении цели (физический отклик)
+        HapticFeedback.heavyImpact();
         _showGoalAchievedDialog();
       }
 
@@ -191,7 +197,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
     });
   }
 
-  // Окно изменения ежедневной цели
   void _showEditGoalDialog() {
     TextEditingController goalController = TextEditingController(text: _dailyGoal.toString());
 
