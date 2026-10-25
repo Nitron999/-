@@ -59,7 +59,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
   int _steps = 0;
   int _savedBaseSteps = -1;
   bool _hasPermission = false;
-  int _dailyGoal = 5000; // Цель по умолчанию теперь 5000 шагов
+  int _dailyGoal = 5000; // Цель по умолчанию строго 5000 шагов
 
   String _startDateStr = '-';
   String _startTimeStr = '-';
@@ -181,7 +181,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF00FF87)),
+              borderSide: const BorderSide(color: Color(0xFFFF4B2B)),
             ),
           ),
         ),
@@ -205,7 +205,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
               if (!mounted) return;
               Navigator.pop(context);
             },
-            child: const Text('Найти', style: TextStyle(color: Color(0xFF00FF87), fontWeight: FontWeight.bold)),
+            child: const Text('Найти', style: TextStyle(color: Color(0xFFFF4B2B), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -230,7 +230,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
       _savedBaseSteps = prefs.getInt('base_steps') ?? -1;
       _startDateStr = savedDate;
       _startTimeStr = prefs.getString('start_time') ?? timeFormatted;
-      _dailyGoal = prefs.getInt('daily_goal') ?? 5000; // По умолчанию 5000
+      _dailyGoal = prefs.getInt('daily_goal') ?? 5000;
     });
     
     await _loadHistory();
@@ -337,7 +337,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF00FF87)),
+              borderSide: const BorderSide(color: Color(0xFFFF4B2B)),
             ),
           ),
         ),
@@ -359,7 +359,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
               if (!mounted) return;
               Navigator.pop(context);
             },
-            child: const Text('Сохранить', style: TextStyle(color: Color(0xFF00FF87), fontWeight: FontWeight.bold)),
+            child: const Text('Сохранить', style: TextStyle(color: Color(0xFFFF4B2B), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -374,7 +374,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.military_tech_rounded, color: Color(0xFF00FF87), size: 32),
+            Icon(Icons.military_tech_rounded, color: Color(0xFFFF4B2B), size: 32),
             SizedBox(width: 10),
             Text('Цель выполнена!', style: TextStyle(color: Colors.white, fontSize: 18)),
           ],
@@ -386,7 +386,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Круто!', style: TextStyle(color: Color(0xFF00FF87), fontSize: 16, fontWeight: FontWeight.bold)),
+            child: const Text('Круто!', style: TextStyle(color: Color(0xFFFF4B2B), fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -434,7 +434,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
         return Theme(
           data: ThemeData.dark().copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF00FF87),
+              primary: Color(0xFFFF4B2B),
               onPrimary: Color(0xFF16161E),
               surface: Color(0xFF23232F),
               onSurface: Colors.white,
@@ -464,12 +464,12 @@ class _PedometerScreenState extends State<PedometerScreen> {
           ),
           content: Text(
             'Пройдено шагов: $stepsForDay',
-            style: const TextStyle(color: Color(0xFF00FF87), fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(color: Color(0xFFFF4B2B), fontSize: 20, fontWeight: FontWeight.bold),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('ОК', style: TextStyle(color: Color(0xFF00FF87), fontSize: 16)),
+              child: const Text('ОК', style: TextStyle(color: Color(0xFFFF4B2B), fontSize: 16)),
             ),
           ],
         ),
@@ -525,17 +525,17 @@ class _PedometerScreenState extends State<PedometerScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
                           color: const Color(0xFF23232F),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF00FF87).withOpacity(0.5)),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFF4B2B).withOpacity(0.5)),
                         ),
                         child: Row(
                           children: [
                             Text(
                               'Цель: $_dailyGoal',
-                              style: const TextStyle(color: Color(0xFF00FF87), fontSize: 12, fontWeight: FontWeight.bold),
+                              style: const TextStyle(color: Color(0xFFFF4B2B), fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(width: 4),
-                            const Icon(Icons.edit_rounded, size: 12, color: Color(0xFF00FF87)),
+                            const Icon(Icons.edit_rounded, size: 12, color: Color(0xFFFF4B2B)),
                           ],
                         ),
                       ),
@@ -543,6 +543,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
                 
+                // Главный круг с огненным/красным градиентом
                 Stack(
                   alignment: Alignment.center,
                   children: [
@@ -553,7 +554,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                         value: progress,
                         strokeWidth: 9,
                         backgroundColor: Colors.white12,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00FF87)),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF4B2B)),
                       ),
                     ),
                     Container(
@@ -564,11 +565,11 @@ class _PedometerScreenState extends State<PedometerScreen> {
                         gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFF00FF87), Color(0xFF60EFFF)],
+                          colors: [Color(0xFFFF512F), Color(0xFFFF4B2B)],
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF00FF87).withOpacity(0.35),
+                            color: const Color(0xFFFF4B2B).withOpacity(0.4),
                             blurRadius: 25,
                             spreadRadius: 2,
                           ),
@@ -584,7 +585,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.directions_walk_rounded, size: 30, color: Color(0xFF00FF87)),
+                              const Icon(Icons.directions_walk_rounded, size: 30, color: Color(0xFFFF4B2B)),
                               const SizedBox(height: 2),
                               Text(
                                 '$_steps',
@@ -613,30 +614,34 @@ class _PedometerScreenState extends State<PedometerScreen> {
                   ],
                 ),
 
-                // Супер-объемные 3D-карточки статистики с глубокими тенями
+                // Супер-объемные 3D-карточки со скругленными краями и увеличенным шрифтом
                 Row(
                   children: [
                     Expanded(
-                      child: _buildMassive3DCard(
+                      child: _buildUltramatic3DCard(
                         Icons.route_rounded, 
                         'Дистанция', 
-                        '${distanceKm.toStringAsFixed(2)} км ($distanceMeters м)', 
-                        const Color(0xFF00FF87)
+                        '${distanceKm.toStringAsFixed(2)} км',
+                        '($distanceMeters м)',
+                        const Color(0xFF00FF87),
+                        const Color(0xFF60EFFF)
                       )
                     ),
                     const SizedBox(width: 14),
                     Expanded(
-                      child: _buildMassive3DCard(
+                      child: _buildUltramatic3DCard(
                         Icons.local_fire_department_rounded, 
                         'Калории', 
-                        '$calories ккал', 
-                        const Color(0xFFFF4B2B)
+                        '$calories ккал',
+                        '',
+                        const Color(0xFFFF512F),
+                        const Color(0xFFFF416C)
                       )
                     ),
                   ],
                 ),
 
-                // График активности в массивном объемном стиле
+                // График активности в массивном 3D-стиле со скругленными краями
                 GestureDetector(
                   onTap: _showCalendarPicker,
                   child: Container(
@@ -644,18 +649,18 @@ class _PedometerScreenState extends State<PedometerScreen> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: const Color(0xFF23232F),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF00FF87).withOpacity(0.5), width: 1.5),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFFF4B2B).withOpacity(0.5), width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.5),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
+                          color: Colors.black.withOpacity(0.6),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
                         ),
                         BoxShadow(
-                          color: const Color(0xFF00FF87).withOpacity(0.08),
-                          blurRadius: 15,
-                          spreadRadius: 1,
+                          color: const Color(0xFFFF4B2B).withOpacity(0.12),
+                          blurRadius: 20,
+                          spreadRadius: 2,
                         ),
                       ],
                     ),
@@ -672,11 +677,11 @@ class _PedometerScreenState extends State<PedometerScreen> {
                             Container(
                               padding: const EdgeInsets.all(5),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF00FF87).withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFF00FF87).withOpacity(0.4)),
+                                color: const Color(0xFFFF4B2B).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFFF4B2B).withOpacity(0.4)),
                               ),
-                              child: const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFF00FF87)),
+                              child: const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFFFF4B2B)),
                             ),
                           ],
                         ),
@@ -722,7 +727,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                                         barRods: [
                                           BarChartRodData(
                                             toY: steps.toDouble(),
-                                            color: const Color(0xFF00FF87),
+                                            color: const Color(0xFFFF4B2B),
                                             width: 12,
                                             borderRadius: BorderRadius.circular(4),
                                           ),
@@ -745,7 +750,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                     gradient: const LinearGradient(
                       colors: [Color(0xFFFF416C), Color(0xFFFF4B2B)],
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
                         color: const Color(0xFFFF4B2B).withOpacity(0.5),
@@ -759,7 +764,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     ),
                     child: const Text(
                       'СБРОСИТЬ СЧЕТЧИК',
@@ -780,66 +785,77 @@ class _PedometerScreenState extends State<PedometerScreen> {
     );
   }
 
-  // Функция для отрисовки массивных 3D-карточек с объемными иконками
-  Widget _buildMassive3DCard(IconData icon, String title, String value, Color accentColor) {
+  // Функция для создания ультра-объемных 3D-карточек с исправленным размером текста и сильным скруглением
+  Widget _buildUltramatic3DCard(IconData icon, String title, String mainValue, String subValue, Color color1, Color color2) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF23232F),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: accentColor.withOpacity(0.5), width: 1.5),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color1.withOpacity(0.6), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+            color: Colors.black.withOpacity(0.6),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
           ),
           BoxShadow(
-            color: accentColor.withOpacity(0.18),
-            blurRadius: 15,
+            color: color1.withOpacity(0.22),
+            blurRadius: 20,
             spreadRadius: 1,
           ),
         ],
       ),
       child: Row(
         children: [
-          // Массивная 3D-иконка в ярком контейнере
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  accentColor.withOpacity(0.4),
-                  accentColor.withOpacity(0.1),
-                ],
+                colors: [color1, color2],
               ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: accentColor.withOpacity(0.6), width: 1),
+              borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+                  color: color1.withOpacity(0.5),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Icon(icon, color: accentColor, size: 30),
+            child: Icon(icon, color: Colors.white, size: 28),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  value,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    mainValue,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
                 ),
-                const SizedBox(height: 4),
+                if (subValue.isNotEmpty) ...[
+                  const SizedBox(height: 1),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      subValue,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white70),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 2),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 11, color: Colors.white60, fontWeight: FontWeight.w500),
+                  style: const TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
