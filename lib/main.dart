@@ -14,6 +14,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart' as loc;
+import 'package:url_launcher/url_launcher.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -246,7 +247,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
       setState(() => _status = 'Нет разрешения на датчик');
     }
 
-    // Автоматический запуск GPS-трекинга
     _initLocationTracking();
   }
 
@@ -276,7 +276,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
       }
     } catch (_) {}
 
-    // Слушаем перемещение телефона в реальном времени
     _locationSubscription = _locationService.onLocationChanged.listen((loc.LocationData currentLoc) {
       if (currentLoc.latitude != null && currentLoc.longitude != null) {
         LatLng newPoint = LatLng(currentLoc.latitude!, currentLoc.longitude!);
@@ -288,7 +287,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
           } else {
             final Distance distance = const Distance();
             double meters = distance.as(LengthUnit.Meter, _routePoints.last, newPoint);
-            if (meters >= 3) { // Записывать новую точку каждые 3 метра движения
+            if (meters >= 3) {
               _routePoints.add(newPoint);
               _saveRoute();
             }
@@ -329,7 +328,30 @@ class _PedometerScreenState extends State<PedometerScreen> {
     await prefs.setStringList('route_points', toSave);
   }
 
-  // Кнопка «Найти меня» на карте (прицел)
+  // Открытие Яндекс.Карт с пробками в точке пользователя
+  Future<void> _openYandexMapsWithTraffic() async {
+    HapticFeedback.mediumImpact();
+    LatLng target = _currentPosition ?? (_routePoints.isNotEmpty ? _routePoints.last : const LatLng(55.7558, 37.6173));
+    
+    // Ссылка для открытия Яндекс.Карт по координатам со слоем пробок (l=trf,trfe)
+    final Uri yandexUrl = Uri.parse('yandexmaps://maps.yandex.ru/?ll=${target.longitude},${target.latitude}&z=16&l=map,trf,trfe');
+    final Uri yandexWebUrl = Uri.parse('https://yandex.ru/maps/?ll=${target.longitude},${target.latitude}&z=16&l=map,trf,trfe');
+
+    try {
+      if (await canLaunchUrl(yandexUrl)) {
+        await launchUrl(yandexUrl);
+      } else {
+        await launchUrl(yandexWebUrl, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть Яндекс.Карты')),
+        );
+      }
+    }
+  }
+
   Future<void> _centerOnUser() async {
     HapticFeedback.lightImpact();
     setState(() => _isLocating = true);
@@ -1243,6 +1265,12 @@ class _PedometerScreenState extends State<PedometerScreen> {
                 ),
                 Row(
                   children: [
+                    // Кнопка открытия Яндекс.Карт с пробками
+                    IconButton(
+                      onPressed: _openYandexMapsWithTraffic,
+                      tooltip: 'Открыть в Яндекс.Картах (Пробки)',
+                      icon: const Icon(Icons.traffic_rounded, color: Color(0xFF60EFFF)),
+                    ),
                     IconButton(
                       onPressed: _clearRoute,
                       tooltip: 'Очистить маршрут',
