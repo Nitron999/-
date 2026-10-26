@@ -696,6 +696,39 @@ class _PedometerScreenState extends State<PedometerScreen> {
     );
   }
 
+  Future<void> _resetCounter() async {
+    if (_steps > 0 || _routePoints.length > 1) {
+      SystemSound.play(SystemSoundType.click);
+      HapticFeedback.mediumImpact();
+
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final dateFormatted = DateFormat('dd.MM.yyyy').format(now);
+      final timeFormatted = DateFormat('HH:mm').format(now);
+
+      String dayKey = 'day_steps_$dateFormatted';
+      int existingSteps = prefs.getInt(dayKey) ?? 0;
+      await prefs.setInt(dayKey, existingSteps + _steps);
+
+      await prefs.setInt('base_steps', -1);
+      await prefs.setBool('goal_notified', false);
+      await prefs.remove('route_points');
+
+      setState(() {
+        _savedBaseSteps = -1;
+        _steps = 0;
+        _startDateStr = dateFormatted;
+        _startTimeStr = timeFormatted;
+        _goalAchievedShown = false;
+        _routePoints = _currentPosition != null ? [_currentPosition!] : [];
+      });
+      await prefs.setString('start_date', dateFormatted);
+      await prefs.setString('start_time', timeFormatted);
+
+      await _loadHistory();
+    }
+  }
+
   Future<void> _showCalendarPicker() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     
@@ -727,7 +760,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
       String dayKey = 'day_steps_$formattedDate';
       int stepsForDay = prefs.getInt(dayKey) ?? 0;
 
-      // Если смотрим сегодняшний день, прибавляем то, что на счетчике прямо сейчас
       if (formattedDate == todayFormatted) {
         stepsForDay += _steps;
       }
@@ -758,13 +790,83 @@ class _PedometerScreenState extends State<PedometerScreen> {
     }
   }
 
-  // ЭКРАН 1: ШАГОМЕР
-  Widget _buildPedometerView() {
+  double _calculateRouteDistanceMeters() {
+    if (_routePoints.length < 2) return 0;
+    const Distance distance = Distance();
+    double total = 0;
+    for (int i = 0; i < _routePoints.length - 1; i++) {
+      total += distance.as(LengthUnit.Meter, _routePoints[i], _routePoints[i + 1]);
+    }
+    return total;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     int distanceMeters = (_steps * 0.75).round();
     double distanceKm = distanceMeters / 1000;
     int calories = (_steps * 0.04).round();
     double progress = (_steps / _dailyGoal).clamp(0.0, 1.0);
 
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF13131A), Color(0xFF1C1C26)],
+          ),
+        ),
+        child: SafeArea(
+          child: IndexedStack(
+            index: _selectedIndex,
+            children: [
+              _buildPedometerView(distanceMeters, distanceKm, calories, progress),
+              _buildMapView(),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF16161E),
+          border: Border(
+            top: BorderSide(color: Colors.white.withOpacity(0.08), width: 1),
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            HapticFeedback.selectionClick();
+            setState(() => _selectedIndex = index);
+            if (index == 1 && _currentPosition != null) {
+              Future.delayed(const Duration(milliseconds: 100), () {
+                _mapController.move(_currentPosition!, 16.5);
+              });
+            }
+          },
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          selectedItemColor: const Color(0xFF00FF87),
+          unselectedItemColor: Colors.white54,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontSize: 11),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.directions_walk_rounded),
+              label: 'Шагомер',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.map_rounded),
+              label: 'Карта и маршрут',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ЭКРАН 1: ШАГОМЕР
+  Widget _buildPedometerView(int distanceMeters, double distanceKm, int calories, double progress) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
       child: Column(
@@ -1166,7 +1268,6 @@ class _PedometerScreenState extends State<PedometerScreen> {
                 ),
                 Row(
                   children: [
-                    // Кнопка с машинкой и надписью «навигатор»
                     TextButton.icon(
                       onPressed: _openYandexMapsWithTraffic,
                       style: TextButton.styleFrom(
@@ -1283,7 +1384,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
-                if (subValue.isNotEmpty) ...[
+                if (subValue.errnoType ?? subValue.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   FittedBox(
                     fit: BoxFit.scaleDown,
