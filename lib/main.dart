@@ -528,16 +528,21 @@ class _PedometerScreenState extends State<PedometerScreen> {
   Future<void> _loadHistory() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     Set<String> keys = prefs.getKeys();
-    List<MapEntry<String, int>> loadedHistory = [];
+    Map<String, int> historyMap = {};
 
     for (String key in keys) {
       if (key.startsWith('day_steps_')) {
         String dateStr = key.replaceFirst('day_steps_', '');
         int stepsCount = prefs.getInt(key) ?? 0;
-        loadedHistory.add(MapEntry(dateStr, stepsCount));
+        historyMap[dateStr] = stepsCount;
       }
     }
 
+    String todayFormatted = DateFormat('dd.MM.yyyy').format(DateTime.now());
+    int currentTotalSteps = (historyMap[todayFormatted] ?? 0) + _steps;
+    historyMap[todayFormatted] = currentTotalSteps;
+
+    List<MapEntry<String, int>> loadedHistory = historyMap.entries.toList();
     loadedHistory.sort((a, b) => b.key.compareTo(a.key));
 
     setState(() {
@@ -584,6 +589,7 @@ class _PedometerScreenState extends State<PedometerScreen> {
         _steps = finalSteps;
         _status = 'Счетчик активен';
       });
+      await _loadHistory();
     }).onError((error) {
       setState(() => _status = 'Датчик шагов недоступен');
     });
